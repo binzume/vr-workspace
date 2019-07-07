@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MediaPlayer</title>
+  <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@v0.9.2/dist/aframe-master.min.js"></script>
+  <script src="xylayout/aframe-xylayout.js"></script>
+  <script src="xylayout/aframe-window.js"></script>
+  <script src="js/aframe-material.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/player.js"></script>
+  <script src="vnc/aframe-vnc.js" type="module"></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene fog="type: linear; color: #000; near:20;far:200;" cursor="rayOrigin: mouse; fuse:false"
+    raycaster="objects:.clickable,a-rounded;far:5500" renderer="antialias: true;">
+    <a-sky menu-on-click="template:mainMenuTemplate;offsetY:2"></a-sky>
+    <a-assets>
+      <!-- menu pane -->
+      <script id="mainMenuTemplate" type="text/html">
+        <a-xywindow main-menu position="0 3 -8" title="Menu" width="5" height="0.6" direction="column">
+          <a-xylayout width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch">
+            <a-xybutton name="openMediaSelector" label="Media" width="1"></a-xybutton>
+            <a-xybutton name="openVncClient" label="VNC" width="1"></a-xybutton>
+            <a-xybutton name="openMediaPlayer" label="Player" width="1"></a-xybutton>
+            <a-xybutton name="exitVRButton" label="Exit VR" width="1"></a-xybutton>
+            <a-xybutton name="openDebugLog" label="Console" width="1" menu-on-click="template:debugConsole;check:[debug-log];offsetY:-2"></a-xybutton>
+          </a-xylayout>
+          <a-xylayout width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch">
+            <a-text simple-clock width="3" height="0.6" anchor="center" wrap-count="19" value="0000-00-00 00:00:00"></a-text>
+          </a-xylayout>
+        </a-xywindow>
+      </script>
+      <script id="mediaPlayerTemplate" type="text/html">
+        <a-xywindow media-player="control:.control" width="8" height="6" position="0 5 -12" xy-drag-control="draggable:.windowdraggable">
+          <a-video name="screen" class="windowdraggable" width="8" height="6" src="#loading" material="npot:true;shader: flat;"></a-video>
+          <a-entity class="control">
+            <a-xyrange name="seek" width="8" height="0.4" position="0 2.8 0.1"></a-xyrange>
+            <a-xylayout direction="row" width="8" spacing="0.5" position="0 2 0.1">
+              <a-xybutton name="prev" label="|&lt;" width="1" height="0.8"></a-xybutton>
+              <a-xybutton name="bak10s" label="&lt;10s" width="1" height="0.8"></a-xybutton>
+              <a-xybutton name="playpause" label="&gt;" width="1.2" height="1.2"></a-xybutton>
+              <a-xybutton name="fwd10s" label="10s&gt;" width="1" height="0.8"></a-xybutton>
+              <a-xybutton name="next" label="&gt;|" width="1" height="0.8"></a-xybutton>
+              <a-xybutton name="stereomode" label="3D" width="0.8" height="0.8"></a-xybutton>
+            </a-xylayout>
+            <a-xylayout direction="row" width="7" spacing="0.5" position="0 1.3 0.1">
+              <a-xyrange name="playbackRate" min="0.2" max="3" step="0.2" value="1" width="3" height="0.4"></a-xyrange>
+              <a-text name="playbackRateText" width="0.8" height="0.4" anchor="center" wrap-count="4" value="1.0"></a-text>
+            </a-xylayout>
+          </a-entity>
+        </a-xywindow>
+      </script>
+      <script id="mediaList" type="text/html">
+        <a-xywindow media-selector position="-10 4 -5" title="Media" width="4" height="6" rotation="0 40 0" direction="column">
+          <a-xylayout width="4" height="0.4" direction="row" align-items="stretch" justify-items="stretch">
+            <a-xybutton name="tags-button" label="Tags" width="0.5"></a-xybutton>
+            <a-xybutton name="sort-name-button" label="A-Z" width="0.5"></a-xybutton>
+            <a-xybutton name="sort-updated-button" label="NEW" width="0.5"></a-xybutton>
+            <a-xybutton name="favlist-button" label="Favs" width="0.4"></a-xybutton>
+            <a-xybutton name="fav-button" label="Add" width="0.4"></a-xybutton>
+          </a-xylayout>
+          <a-xyscroll width=4 height=6>
+            <a-plane xyitem="fixed:true" class="xyscroll-fixed" class="clickable" position="2 3 -0.05" width=4 height=6 material="color: #111; opacity:0.5"></a-plane>
+            <a-entity name="medialist" xylist="width:3"></a-entity>
+          </a-xyscroll>
+        </a-xywindow>
+      </script>
+      <script id="vncClient" type="text/html">
+        <a-xywindow position="0 2 -8" title="VNC Client" width="16" height="9">
+          <a-vnc width="16" height="9" dialog="#vncdialog"></a-vnc>
+          <a-xywindow xyitem="fixed:true" id="vncdialog" position="0 0 3" width="2" height="1.5" xywindow="closable:false">
+            <a-xylayout width=2 height=1>
+              <a-input xyrect name="vnc_address" placeholder="host:port" color="black" width="1" height="0.16"></a-input>
+              <a-input xyrect name="vnc_password" placeholder="Password" type="password" color="black" width="1" height="0.16"></a-input>
+              <a-xybutton name="vnc_connect" label="Connect" type="raised" xyrect="height:0.22" scale="0.5 0.5 0.5"></a-xybutton>
+            </a-xylayout>
+          </a-xywindow>
+        </a-xywindow>
+      </script>
+      <!-- debug console -->
+      <script id="debugConsole" type="text/html">
+        <a-xywindow title="DebugLog" debug-log="log:debug-text" width="6" height="4" position="0 5 -12">
+          <a-text name="debug-text" width="5" height="4" anchor="center" wrap-count="40" value=""></a-text>
+        </a-xywindow>
+      </script>
+      <img id="loading" src="images/loading.png" />
+      <img id="imageData0" />
+    </a-assets>
+
+    <a-plane id="ground" material="shader:gridground" rotation="-90 0 0" width="1000" height="1000" color="#111188"></a-plane>
+
+    <a-entity id="camera-rig" wasd-controls position-controls>
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable,.clickable,a-rounded"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable,.clickable,a-rounded"></a-entity>
+    </a-entity>
+
+    <!-- kbd -->
+    <a-entity position="-1.5 1.0 -2">
+      <a-keyboard physical-keyboard="true"></a-keyboard>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
