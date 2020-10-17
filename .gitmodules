@@ -1,0 +1,12 @@
+[submodule "apps/vnc"]
+	path = apps/vnc
+	url = github.com:binzume/aframe-vnc.git
+[submodule "apps/mediaplayer"]
+	path = apps/mediaplayer
+	url = github.com:binzume/aframe-mediaplayer.git
+[submodule "apps/rosso"]
+	path = apps/rosso
+	url = git@github.com:binzume/webvr-rosso.git
+[submodule "utils"]
+	path = utils
+	url = git@github.com:binzume/vr-utils.git

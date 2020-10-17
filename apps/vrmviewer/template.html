@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>vrmviewer</title>
+  <script src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
+  <script src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="https://binzume.github.io/aframe-vrm/vrm.js" class='required'></script>
+  <script src="vrmviewer.js" class='required'></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene>
+
+    <!-- VRM -->
+    <a-entity id="app-vrm"
+      data-import="//cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js">
+      <a-entity vrm-select xy-drag-control="draggable:.stage" vrm="lookAt:a-camera;enablePhysics:true" vrm-bvh="" rotation="0 180 0" position="0 0 -1">
+        <a-box class="stage collidable" wireframe='true' width="0.4" depth="0.4" height="0.04" position="0 -0.02 0">
+        </a-box>
+      </a-entity>
+    </a-entity>
+
+    <!-- VRM Blend shape panel -->
+    <a-entity id="blendShape">
+      <a-xywindow position="7 3 -9" title="BlendShape" width="3" height="4" pose-editor-window window-locator xycontainer="direction:column">
+        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+          <a-xybutton name="reset-all-morph" label="ResetAll" height=0.5></a-xybutton>
+        </a-xycontainer>
+        <a-xyscroll width=3 height=4 scrollbar=false>
+          <a-entity name="item-list" xylist="itemHeight:0.5" xyrect="width:3"></a-entity>
+        </a-xyscroll>
+      </a-xywindow>
+    </a-entity>
+
+    <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
