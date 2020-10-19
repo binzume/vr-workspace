@@ -490,7 +490,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		let m = fragment.match(/list:(.+)/);
 		if (m) {
 			let mediaList = await instantiate('mediaListTemplate');
-			mediaList.setAttribute('media-selector', "path:" + m[1]);
+			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA' });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);
