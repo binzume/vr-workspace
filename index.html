@@ -17,12 +17,13 @@
 
 <body style="background-color: black; color:white;">
   <div id='applications' style='display:none'>
-    <a id="mediaPlayerTemplate" href="apps/mediaplayer/template.html#mediaPlayerTemplate">MediaPlayer</a>
+    <a id="applist" href="#apps-panel" class='hidden'>Apps</a>
+    <a id="app-calc" href="apps/calc/template.html">Calculator</a>
     <a id="mediaListTemplate" href="apps/mediaplayer/template.html#mediaListTemplate">Files</a>
-    <a id="app-vnc" href="apps/vnc/template.html">VNC</a>
-    <a id="app-calc" href="apps/calc/template.html">Calc</a>
-    <a id="app-vrm" href="apps/vrmviewer/template.html"></a>
-    <a id="app-vrm-blendShape" href="apps/vrmviewer/template.html#blendShape">VRM BlendShape</a>
+    <a id="mediaPlayerTemplate" href="apps/mediaplayer/template.html#mediaPlayerTemplate">MediaPlayer</a>
+    <a id="app-vnc" href="apps/vnc/template.html">VNC Client</a>
+    <a id="app-vrm" href="apps/vrmviewer/template.html" class='hidden'>VRM Viewer</a>
+    <a id="app-vrm-blendShape" href="apps/vrmviewer/template.html">VRM BlendShape</a>
     <a id="app-console" href="#debugConsole" data-wid='debug-console'>Console</a>
     <a id="env-rosso" href="apps/rosso/index.html#env" data-apptype='env'>env:ROSSO</a>
     <a id="env-physics" href="apps/physics/index.html#env" data-apptype='env'>env:Physics</a>
@@ -48,9 +49,9 @@
       <template id="mainMenuTemplate">
         <a-xywindow main-menu window-locator="applyCameraPos:false" position="0 1 -1.5" title="Menu" width="5" height="0.6" scale="0.2 0.2 0.2" xycontainer="direction:column;spacing:0.05">
           <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
-            <a-xyselect name='appsButton' label="Apps" width="1" values=""></a-xyselect>
-            <a-xybutton label="Files" width="1" instantiate-on-click="template:mediaListTemplate"></a-xybutton>
-            <a-xybutton label="Console" width="1" instantiate-on-click="template:app-console;id:debug-console"></a-xybutton>
+            <a-xybutton label="Apps" width="1" launch-on-click="appid:applist"></a-xybutton>
+            <a-xybutton label="Files" width="1" launch-on-click="appid:mediaListTemplate"></a-xybutton>
+            <a-xybutton label="Console" width="1" launch-on-click="appid:app-console"></a-xybutton>
             <a-xybutton name="exitVRButton" label="Exit VR" width="1"></a-xybutton>
           </a-xycontainer>
           <a-xycontainer search-box width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
@@ -67,6 +68,18 @@
       <template id="debugConsole">
         <a-xywindow title="DebugLog" debug-log="log:debug-text" width="6" height="4" position="2 1 -3" scale="0.2 0.2 0.2">
           <a-text name="debug-text" width="5" height="4" anchor="center" wrap-count="40" value=""></a-text>
+        </a-xywindow>
+      </template>
+
+      <!-- Apps -->
+      <template id="apps-panel">
+        <a-xywindow apps-panel xywindow="closable:false;background:true" position="0 1 -1.3" scale="0.1 0.1 0.1" title="Apps" width="5" height="6" xycontainer="direction:column">
+          <a-xyscroll width=5 height=5.2 scrollbar=false>
+            <a-entity name="apps-panel-list" xylist="" xyrect=""></a-entity>
+          </a-xyscroll>
+          <a-xycontainer width="5" height="0.8" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+            <a-xybutton name="close-button" label="x" width="1"></a-xybutton>
+          </a-xycontainer>
         </a-xywindow>
       </template>
 

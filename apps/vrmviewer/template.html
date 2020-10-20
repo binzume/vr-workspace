@@ -6,6 +6,7 @@
   <title>vrmviewer</title>
   <script src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
   <script src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="//cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js" class='required'></script>
   <script src="https://binzume.github.io/aframe-vrm/vrm.js" class='required'></script>
   <script src="vrmviewer.js" class='required'></script>
 </head>
@@ -14,8 +15,7 @@
   <a-scene>
 
     <!-- VRM -->
-    <a-entity id="app-vrm"
-      data-import="//cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js">
+    <a-entity id="app-vrm">
       <a-entity vrm-select xy-drag-control="draggable:.stage" vrm="lookAt:a-camera;enablePhysics:true" vrm-bvh="" rotation="0 180 0" position="0 0 -1">
         <a-box class="stage collidable" wireframe='true' width="0.4" depth="0.4" height="0.04" position="0 -0.02 0">
         </a-box>
@@ -23,7 +23,7 @@
     </a-entity>
 
     <!-- VRM Blend shape panel -->
-    <a-entity id="blendShape">
+    <a-entity id="app-vrm-blendShape">
       <a-xywindow position="7 3 -9" title="BlendShape" width="3" height="4" pose-editor-window window-locator xycontainer="direction:column">
         <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xybutton name="reset-all-morph" label="ResetAll" height=0.5></a-xybutton>

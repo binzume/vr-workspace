@@ -1,33 +1,159 @@
 "use strict";
 
+/** 
+ * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string|null;}} AppInfo
+ * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
+ */
+class AppManager {
+	constructor() {
+		/** @type {AppInfo[]} */
+		this.apps = [];
+		/** @type {((c:ContentInfo) => boolean)[]} */
+		this.contentHandlers = [];
+	}
+
+	/**
+	 * @param {string} selector
+	 */
+	loadApps(selector) {
+		/** @type {AppInfo[]} */
+		let apps = [];
+		for (let el of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll(selector))) {
+			if (el.id) {
+				let type = el.dataset.apptype || 'app';
+				let hidden = el.classList.contains('hidden');
+				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.href, hidden: hidden, wid: el.dataset.wid };
+				apps.push(app);
+			}
+		}
+		try {
+			let s = localStorage.getItem('vrApps');
+			if (s !== null) {
+				apps = apps.concat(JSON.parse(s));
+			}
+		} catch (e) {
+			console.log('error', e);
+		}
+		this.apps = apps;
+	}
+
+	/**
+	 * @param {string} id 
+	 */
+	async launch(id) {
+		let app = this.getAppById(id);
+		if (app == null) {
+			console.log('app not found:' + id);
+			return null;
+		}
+		if (app.wid && document.getElementById(app.wid)) {
+			console.log('already exists:' + app.wid);
+			return null;
+		}
+		let el = await instantiate(app.id);
+		if (app.wid) {
+			el.id = app.wid;
+		}
+		if (el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
+			el.setAttribute('window-locator', '');
+		}
+		return el;
+	}
+
+	/**
+	 * @param {string} id 
+	 * @returns {AppInfo}
+	 */
+	getAppById(id) {
+		return this.apps.find(app => app.id == id);
+	}
+
+	/**
+	 * @param {AppInfo} app
+	 * @param {boolean} save
+	 */
+	install(app, save) {
+		if (this.getAppById(app.id) != null) {
+			return false;
+		}
+		this.apps.push(app);
+		return true;
+	}
+
+	/**
+	 * @param {ContentInfo} contentInfo
+	 */
+	openContent(contentInfo) {
+		for (let handler of this.contentHandlers) {
+			if (handler(contentInfo)) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+globalThis.appManager = new AppManager();
+
 AFRAME.registerComponent('main-menu', {
 	schema: {},
 	init: function () {
 		this._elByName('exitVRButton').addEventListener('click', (ev) => {
 			this.el.sceneEl.exitVR();
 		});
-		let apps = [];
-		let appIds = [];
-		for (let el of document.querySelectorAll('#applications>a')) {
-			if (el.id && el.innerText) {
-				apps.push(el.innerText);
-				appIds.push(el.id);
-			}
-		}
-		let appsButton = this._elByName('appsButton');
-		appsButton.setAttribute('values', apps.join(','));
-		appsButton.addEventListener('change', async (ev) => {
-			let id = appIds[ev.detail.index];
-			let wid = document.getElementById(id).dataset.wid;
-			if (wid && document.getElementById(wid)) {
-				console.log('already exists:' + wid);
-				return;
-			}
-			let el = await instantiate(id);
-			if (wid) {
-				el.id = wid;
+	},
+	_elByName(name) {
+		return this.el.querySelector("[name=" + name + "]");
+	}
+});
+
+
+AFRAME.registerComponent('apps-panel', {
+	schema: {},
+	init: function () {
+		this._elByName('close-button').addEventListener('click', (ev) => {
+			this.el.parentNode.removeChild(this.el);
+		});
+		let windowWidth = this.el.getAttribute('width');
+		let cols = Math.floor(windowWidth / 1.2);
+		let itemWidth = windowWidth / cols;
+		let itemHeight = itemWidth;
+		let listEl = this._elByName('apps-panel-list');
+		listEl.components.xylist.setLayout({
+			size(itemCount) {
+				return { width: itemWidth * cols, height: itemHeight * Math.ceil(itemCount / cols) };
+			},
+			*targets(viewport) {
+				let position = Math.floor((-viewport[0]) / itemHeight) * cols;
+				let end = Math.ceil((-viewport[1]) / itemHeight) * cols;
+				while (position < end) {
+					yield position++;
+				}
+			},
+			layout(el, position) {
+				let x = (position % cols) * itemWidth, y = - Math.floor(position / cols) * itemHeight;
+				let xyrect = el.components.xyrect;
+				let pivot = xyrect ? xyrect.data.pivot : { x: 0.5, y: 0.5 };
+				el.setAttribute("position", { x: x + pivot.x * xyrect.width, y: y - pivot.y * xyrect.height, z: 0 });
 			}
 		});
+		let apps = appManager.apps.filter(app => !app.hidden);
+		listEl.components.xylist.setAdapter({
+			selector: this,
+			create(parent) {
+				var el = document.createElement('a-xybutton');
+				el.setAttribute("width", itemWidth);
+				el.setAttribute("height", itemHeight);
+				return el;
+			}, bind(position, el, data) {
+				el.setAttribute('label', apps[position].name);
+			}
+		});
+		listEl.addEventListener('clickitem', async (ev) => {
+			this.el.parentNode.removeChild(this.el);
+			appManager.launch(apps[ev.detail.index].id);
+		});
+		listEl.components.xylist.setContents(apps);
 	},
 	_elByName(name) {
 		return this.el.querySelector("[name=" + name + "]");
@@ -279,20 +405,16 @@ AFRAME.registerComponent('position-controls', {
 	}
 });
 
-AFRAME.registerComponent('instantiate-on-click', {
+AFRAME.registerComponent('launch-on-click', {
 	schema: {
-		template: { type: 'string', default: '' },
-		id: { type: 'string', default: '' },
+		appid: { type: 'string', default: '' },
 		align: { type: 'string', default: '' }
 	},
 	init() {
 		this.el.addEventListener('click', async (ev) => {
-			if (this.data.id && document.getElementById(this.data.id)) {
+			let el = await appManager.launch(this.data.appid);
+			if (!el) {
 				return;
-			}
-			let el = await instantiate(this.data.template);
-			if (this.data.id) {
-				el.id = this.data.id;
 			}
 			if (this.data.align == 'raycaster') {
 				if (!ev.detail.cursorEl || !ev.detail.cursorEl.components.raycaster) {
@@ -316,7 +438,7 @@ AFRAME.registerComponent('window-locator', {
 	schema: {
 		applyCameraPos: { default: true },
 		updateRotation: { default: true },
-		interval: { default: 0.25 }
+		interval: { default: 0.1 }
 	},
 	init() {
 		this.el.sceneEl.addEventListener('enter-vr', ev => {
@@ -369,7 +491,7 @@ async function instantiate(id, parent) {
 	let apptype = template.dataset.apptype;
 	let base = location.href;
 	let modules = [];
-	if (template.href) {
+	if (template instanceof HTMLAnchorElement) {
 		let url = template.href;
 		let assets = document.querySelector('a-assets');
 		let response = await new Promise((resolve, reject) => assets.fileLoader.load(url.replace(/#.*$/, ''), resolve, null, reject));
@@ -433,34 +555,34 @@ async function instantiate(id, parent) {
 	return first;
 }
 
-/**
- * @param {{name: string; type: string; url: string;}} item 
- */
-function openItem(item) {
-	let ext = '';
-	let m = item.name.match(/\.(\w+)$/);
-	if (m) {
-		ext = m[1].toLowerCase();
-	}
-
-	if (['vrm', 'glb'].includes(ext)) {
-		(async () => {
-			let el = await instantiate('app-vrm');
-			el.setAttribute('vrm', { src: item.url });
-		})();
-		return true;
-	}
-	if (['bvh'].includes(ext)) {
-		let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
-		if (activeModel) {
-			el.setAttribute('vrm-bvh', { src: item.url });
+window.addEventListener('DOMContentLoaded', async (ev) => {
+	appManager.loadApps('#applications>a');
+	appManager.contentHandlers.push((item) => {
+		let ext = '';
+		let m = item.name.match(/\.(\w+)$/);
+		if (m) {
+			ext = m[1].toLowerCase();
+		}
+		if (['vrm', 'glb'].includes(ext)) {
+			(async () => {
+				let el = await appManager.launch('app-vrm');
+				if (item.url == null && item.fetch) {
+					item.url = URL.createObjectURL(await (await item.fetch()).blob());
+				}
+				el.setAttribute('vrm', { src: item.url });
+			})();
 			return true;
 		}
-	}
-	return false;
-}
+		if (['bvh'].includes(ext)) {
+			let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
+			if (activeModel) {
+				activeModel.setAttribute('vrm-bvh', { src: item.url });
+				return true;
+			}
+		}
+		return false;
+	});
 
-window.addEventListener('DOMContentLoaded', async (ev) => {
 	(await instantiate('mainMenuTemplate')).id = 'mainMenu';
 
 	// gesture
@@ -489,7 +611,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		let fragment = location.hash.slice(1);
 		let m = fragment.match(/list:(.+)/);
 		if (m) {
-			let mediaList = await instantiate('mediaListTemplate');
+			let mediaList = await window.appManager.launch('mediaListTemplate');
 			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA' });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
