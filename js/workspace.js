@@ -1,10 +1,12 @@
 "use strict";
 
+/// <reference path="../node_modules/three/src/Three.d.ts" />
+/// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /** 
  * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string|null;}} AppInfo
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
  */
-class AppManager {
+ class AppManager {
 	constructor() {
 		/** @type {AppInfo[]} */
 		this.apps = [];
@@ -155,20 +157,23 @@ AFRAME.registerComponent('apps-panel', {
 		});
 		listEl.components.xylist.setContents(apps);
 	},
+	/**
+	 * @param {string} name 
+	 */
 	_elByName(name) {
-		return this.el.querySelector("[name=" + name + "]");
+		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
 	}
 });
 
 AFRAME.registerComponent('search-box', {
 	init() {
 		let searchButton = this.el.querySelector('a-xybutton');
-		let searchKeyword = this.el.querySelector('a-xyinput');
+		let searchKeyword = /** @type {HTMLInputElement} */ (this.el.querySelector('a-xyinput'));
 		searchButton.addEventListener('click', (ev) => {
 			this._search(searchKeyword.value);
 		});
 
-		searchKeyword.addEventListener('keydown', (ev) => {
+		searchKeyword.addEventListener('keydown', ( /** @type {KeyboardEvent} */ ev) => {
 			if (ev.code == 'Enter' && searchKeyword.value != '') {
 				this._search(searchKeyword.value);
 			}
@@ -201,7 +206,7 @@ AFRAME.registerComponent('debug-log', {
 		timestamp: { default: true },
 		lines: { default: 12 }
 	},
-	init: function () {
+	init() {
 		this.log = [];
 		this.logEl = this.el.querySelector('[name=debug-text]');
 		this.addlog = (msg) => {
@@ -235,8 +240,8 @@ AFRAME.registerComponent('camera-control', {
 		homePosition: { type: 'vec3', default: { x: 0, y: 0, z: 1 } },
 		vrHomePosition: { type: 'vec3', default: { x: 0, y: 0, z: 0 } }
 	},
+	dragging: false,
 	init() {
-		this.dragging = false;
 		this.el.sceneEl.addEventListener('exit-vr', ev => this.resetPosition());
 		this.el.sceneEl.addEventListener('enter-vr', ev => this.resetPosition());
 		this.resetPosition();
@@ -309,8 +314,9 @@ AFRAME.registerComponent('position-controls', {
 		speed: { default: 0.1 },
 		rotationSpeed: { default: 0.1 }
 	},
-	init: function () {
+	init() {
 		let data = this.data;
+		let el = this.el;
 		if (data.arrowkeys || data.wasdkeys) {
 			let fns = {
 				rotation: [
@@ -365,10 +371,10 @@ AFRAME.registerComponent('position-controls', {
 				}
 			});
 		}
-		this.changed = [];
-		this.el.addEventListener('gripdown', ev => {
+		let changed = [];
+		el.addEventListener('gripdown', ev => {
 			document.querySelectorAll("[xy-drag-control]").forEach(el => {
-				el.components['xy-drag-control'].postProcess = (targetObj, ev) => {
+				el.components['xy-drag-control'].postProcess = (targetObj, /** @type {CustomEvent} */ ev) => {
 					let { origin, direction } = ev.detail.raycaster.ray;
 					let direction0 = ev.detail.prevRay.direction;
 					let targetPosition = targetObj.getWorldPosition(new THREE.Vector3());
@@ -376,18 +382,18 @@ AFRAME.registerComponent('position-controls', {
 					let f = targetPosition.distanceTo(origin) * 2;
 					targetObj.position.add(direction.clone().multiplyScalar(-d.y * f));
 				};
-				this.changed.push([el, Object.assign({}, el.getAttribute('xy-drag-control'))]);
+				changed.push([el, Object.assign({}, el.getAttribute('xy-drag-control'))]);
 			});
 		});
-		this.el.addEventListener('gripup', ev => {
-			this.changed.forEach(([el, dragControl]) => {
+		el.addEventListener('gripup', ev => {
+			changed.forEach(([el, dragControl]) => {
 				if (el.components['xy-drag-control']) {
 					el.components['xy-drag-control'].postProcess = null;
 				}
 			});
-			this.changed = [];
+			changed = [];
 		});
-		this.el.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('thumbstickmoved', ev => {
+		el.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('thumbstickmoved', (/** @type {CustomEvent} */ ev) => {
 			let direction = ev.target.components.raycaster.raycaster.ray.direction;
 			if (this.data.axismove == "translation") {
 				let rot = Math.atan2(direction.x, direction.z);
@@ -411,7 +417,7 @@ AFRAME.registerComponent('launch-on-click', {
 		align: { type: 'string', default: '' }
 	},
 	init() {
-		this.el.addEventListener('click', async (ev) => {
+		this.el.addEventListener('click', async (/** @type {CustomEvent} */ ev) => {
 			let el = await appManager.launch(this.data.appid);
 			if (!el) {
 				return;
@@ -486,10 +492,15 @@ AFRAME.registerComponent('window-locator', {
 
 
 // utils
+/**
+ * 
+ * @param {string} id 
+ * @param {*} [parent]
+ */
 async function instantiate(id, parent) {
 	let template = document.getElementById(id);
 	let apptype = template.dataset.apptype;
-	let base = location.href;
+	let base = new URL(location.href);
 	let modules = [];
 	if (template instanceof HTMLAnchorElement) {
 		let url = template.href;
@@ -501,14 +512,14 @@ async function instantiate(id, parent) {
 		doc.head.append(baseEl);
 		base = new URL(url);
 
-		for (let img of doc.querySelectorAll('a-assets>img')) {
+		for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {
 			if (img.id && !document.getElementById(img.id)) {
 				img.src = img.src; // apply base url.
-				assets.appendChild(document.importNode(img));
+				assets.appendChild(document.importNode(img, false));
 			}
 		}
-		for (let script of doc.querySelectorAll('script.required')) {
-			modules.push(new URL(script.src));
+		for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
+			modules.push(script.src);
 		}
 		for (let el of doc.querySelectorAll('[gltf-model]')) {
 			let attr = el.getAttribute('gltf-model');
@@ -538,7 +549,7 @@ async function instantiate(id, parent) {
 	let imp = template.dataset.import;
 	if (imp) {
 		for (let mod of imp.split(';')) {
-			modules.push(new URL(mod, base));
+			modules.push((new URL(mod, base)).toString());
 		}
 	}
 	for (let mod of modules) {
@@ -552,7 +563,7 @@ async function instantiate(id, parent) {
 	for (let el of Array.from(wrapper.children)) {
 		(parent || document.querySelector('a-scene')).appendChild(el);
 	}
-	return first;
+	return /** @type {import("aframe").Entity} */ (first);
 }
 
 window.addEventListener('DOMContentLoaded', async (ev) => {
@@ -586,10 +597,10 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 	(await instantiate('mainMenuTemplate')).id = 'mainMenu';
 
 	// gesture
-	document.body.addEventListener('gesture', async (ev) => {
+	document.body.addEventListener('gesture', async (/** @type {CustomEvent} */ ev) => {
 		console.log(ev.detail.name);
 		if (ev.detail.name == 'L') {
-			let menu = document.getElementById('mainMenu');
+			let menu = /** @type {import("aframe").Entity} */(document.getElementById('mainMenu'));
 			if (!menu) {
 				menu = await instantiate('mainMenuTemplate');
 				menu.id = 'mainMenu';
