@@ -1,0 +1,27 @@
+{
+  "name": "vr-workspace",
+  "description": "workspace for WebXR",
+  "version": "0.0.0",
+  "author": "binzume",
+  "main": "js/workspace.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/binzume/vr-workspace.git"
+  },
+  "keywords": [
+    "WebXR",
+    "GoogleDrive",
+    "A-Frame"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/binzume/vr-workspace/issues"
+  },
+  "homepage": "https://github.com/binzume/vr-workspace#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/aframe": "^1.0.1",
+    "three": "^0.121.1"
+  }
+}

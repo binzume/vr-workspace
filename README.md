@@ -5,6 +5,8 @@
 
 T.B.D.
 
+https://binzume.github.io/vr-workspace/
+
 ## Available apps
 
 - Calculator
