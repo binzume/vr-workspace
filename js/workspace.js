@@ -1,12 +1,12 @@
+// @ts-check
 "use strict";
 
-/// <reference path="../node_modules/three/src/Three.d.ts" />
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /** 
  * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string|null;}} AppInfo
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
  */
- class AppManager {
+class AppManager {
 	constructor() {
 		/** @type {AppInfo[]} */
 		this.apps = [];
@@ -109,7 +109,6 @@ AFRAME.registerComponent('main-menu', {
 	}
 });
 
-
 AFRAME.registerComponent('apps-panel', {
 	schema: {},
 	init: function () {
@@ -121,7 +120,8 @@ AFRAME.registerComponent('apps-panel', {
 		let itemWidth = windowWidth / cols;
 		let itemHeight = itemWidth;
 		let listEl = this._elByName('apps-panel-list');
-		listEl.components.xylist.setLayout({
+		let list = listEl.components.xylist;
+		list.setLayout({
 			size(itemCount) {
 				return { width: itemWidth * cols, height: itemHeight * Math.ceil(itemCount / cols) };
 			},
@@ -140,7 +140,7 @@ AFRAME.registerComponent('apps-panel', {
 			}
 		});
 		let apps = appManager.apps.filter(app => !app.hidden);
-		listEl.components.xylist.setAdapter({
+		list.setAdapter({
 			selector: this,
 			create(parent) {
 				var el = document.createElement('a-xybutton');
@@ -151,11 +151,11 @@ AFRAME.registerComponent('apps-panel', {
 				el.setAttribute('label', apps[position].name);
 			}
 		});
-		listEl.addEventListener('clickitem', async (ev) => {
+		listEl.addEventListener('clickitem', async (/** @type {CustomEvent} */ ev) => {
 			this.el.parentNode.removeChild(this.el);
 			appManager.launch(apps[ev.detail.index].id);
 		});
-		listEl.components.xylist.setContents(apps);
+		list.setContents(apps);
 	},
 	/**
 	 * @param {string} name 
@@ -187,6 +187,7 @@ AFRAME.registerComponent('search-box', {
 
 AFRAME.registerComponent('simple-clock', {
 	schema: {},
+	_intervalId: 0,
 	init() {
 		this._intervalId = setInterval(() => this.el.setAttribute('value', this._formatTime(new Date())), 1000);
 		this.el.setAttribute('value', this._formatTime(new Date()));
@@ -206,31 +207,34 @@ AFRAME.registerComponent('debug-log', {
 		timestamp: { default: true },
 		lines: { default: 12 }
 	},
+	log: [],
+	orgLog: null,
 	init() {
-		this.log = [];
-		this.logEl = this.el.querySelector('[name=debug-text]');
-		this.addlog = (msg) => {
-			this.orgLog(msg);
-			let header = '';
-			if (this.data.timestamp) {
-				let now = new Date();
-				header = "[" + now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds() + "]: ";
-			}
-			this.log.push(header + msg);
-			if (this.log.length > this.data.lines) this.log.shift();
-			this.logEl.setAttribute('value', this.log.join("\n"));
-		};
-
 		this.orgLog = console.log;
-		console.log = this.addlog;
+		console.log = this._addLog.bind(this);
 
-		this.onerror = (ev) => { this.addlog("ERROR: " + ev.reason ? (ev.reason.message + ' ' + ev.reason.stack) : (ev.message + ev.filename + ':' + ev.line)); }
-		window.addEventListener('error', this.onerror);
-		window.addEventListener('unhandledrejection', this.onerror);
+		this._onerror = this._onerror.bind(this);
+		window.addEventListener('error', this._onerror);
+		window.addEventListener('unhandledrejection', this._onerror);
 	},
-	remove: function () {
-		window.removeEventListener('error', this.onerror);
-		window.removeEventListener('unhandledrejection', this.onerror);
+	_addLog(...msg) {
+		this.orgLog(...msg);
+		let header = '';
+		if (this.data.timestamp) {
+			let now = new Date();
+			header = "[" + now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds() + "]: ";
+		}
+		this.log.push(header + msg.map(m => String(m)).join(' '));
+		if (this.log.length > this.data.lines) this.log.shift();
+		let logEl = this.el.querySelector('[name=debug-text]');
+		logEl.setAttribute('value', this.log.join("\n"));
+	},
+	_onerror(ev) {
+		this._addLog("ERROR: " + ev.reason ? (ev.reason.message + ' ' + ev.reason.stack) : (ev.message + ev.filename + ':' + ev.line));
+	},
+	remove() {
+		window.removeEventListener('error', this._onerror);
+		window.removeEventListener('unhandledrejection', this._onerror);
 		console.log = this.orgLog;
 	}
 });
@@ -622,7 +626,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		let fragment = location.hash.slice(1);
 		let m = fragment.match(/list:(.+)/);
 		if (m) {
-			let mediaList = await window.appManager.launch('mediaListTemplate');
+			let mediaList = await window.appManager.launch('app-media-selector');
 			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA' });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
