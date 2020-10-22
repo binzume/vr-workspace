@@ -1,4 +1,3 @@
-// @ts-check
 "use strict";
 
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
@@ -41,8 +40,9 @@ class AppManager {
 
 	/**
 	 * @param {string} id 
+	 * @param {Element} sceneEl
 	 */
-	async launch(id) {
+	async launch(id, sceneEl = null) {
 		let app = this.getAppById(id);
 		if (app == null) {
 			console.log('app not found:' + id);
@@ -52,7 +52,7 @@ class AppManager {
 			console.log('already exists:' + app.wid);
 			return null;
 		}
-		let el = await instantiate(app.id);
+		let el = await instantiate(app.id, sceneEl);
 		if (app.wid) {
 			el.id = app.wid;
 		}
@@ -377,6 +377,7 @@ AFRAME.registerComponent('position-controls', {
 		}
 		let changed = [];
 		el.addEventListener('gripdown', ev => {
+			console.log('gripdown');
 			document.querySelectorAll("[xy-drag-control]").forEach(el => {
 				el.components['xy-drag-control'].postProcess = (targetObj, /** @type {CustomEvent} */ ev) => {
 					let { origin, direction } = ev.detail.raycaster.ray;
@@ -418,28 +419,10 @@ AFRAME.registerComponent('position-controls', {
 AFRAME.registerComponent('launch-on-click', {
 	schema: {
 		appid: { type: 'string', default: '' },
-		align: { type: 'string', default: '' }
 	},
 	init() {
-		this.el.addEventListener('click', async (/** @type {CustomEvent} */ ev) => {
-			let el = await appManager.launch(this.data.appid);
-			if (!el) {
-				return;
-			}
-			if (this.data.align == 'raycaster') {
-				if (!ev.detail.cursorEl || !ev.detail.cursorEl.components.raycaster) {
-					return;
-				}
-				var raycaster = ev.detail.cursorEl.components.raycaster.raycaster;
-				var rot = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), raycaster.ray.direction);
-				var origin = raycaster.ray.origin;
-
-				el.addEventListener('loaded', (ev) => {
-					let pos = new THREE.Vector3().add(el.getAttribute('position')).applyQuaternion(rot);
-					el.setAttribute('position', pos.add(origin));
-					el.components['window-locator'] && el.components['window-locator'].updateRotation();
-				}, { once: true });
-			}
+		this.el.addEventListener('click', async (ev) => {
+			await appManager.launch(this.data.appid);
 		});
 	}
 });
@@ -463,15 +446,20 @@ AFRAME.registerComponent('window-locator', {
 	update(oldData) {
 		let el = this.el;
 		let windows = el.sceneEl.systems.xywindow.windows;
-		if (el.sceneEl.is('vr-mode') && this.data.updateRotation) {
-			this.updateRotation();
-		}
 
-		let pos = new THREE.Vector3().copy(el.getAttribute('position'));
+		let pos = this.el.object3D.position;
 		if (!oldData.applyCameraPos && this.data.applyCameraPos) {
-			let campos = el.sceneEl.camera.getWorldPosition(new THREE.Vector3());
-			campos.y = 0;
-			pos.add(campos);
+			let camPos = new THREE.Vector3();
+			let camRot = new THREE.Quaternion();
+			let h = pos.y;
+			if (el.sceneEl.is('vr-mode')) {
+				pos.x = 0;
+				pos.y = 0;
+			}
+			el.sceneEl.camera.matrixWorld.decompose(camPos, camRot, new THREE.Vector3());
+			pos.applyQuaternion(camRot);
+			pos.add(camPos);
+			pos.y = Math.max(Math.min(pos.y, h + 1), 0);
 		}
 
 		let dd = this.data.interval;
@@ -482,15 +470,16 @@ AFRAME.registerComponent('window-locator', {
 			}
 			pos.add(d);
 		}
-		el.setAttribute('position', pos);
+
+		if (el.sceneEl.is('vr-mode') && this.data.updateRotation) {
+			this.updateRotation();
+		}
 	},
 	updateRotation() {
-		let tr = new THREE.Matrix4();
 		let cameraPosition = this.el.sceneEl.camera.getWorldPosition(new THREE.Vector3());
 		let targetPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-		tr.lookAt(cameraPosition, targetPosition, new THREE.Vector3(0, 1, 0));
-		let q = new THREE.Quaternion().setFromRotationMatrix(tr);
-		this.el.object3D.setRotationFromQuaternion(q);
+		let tr = new THREE.Matrix4().lookAt(cameraPosition, targetPosition, new THREE.Vector3(0, 1, 0));
+		this.el.object3D.setRotationFromMatrix(tr);
 	}
 });
 
@@ -603,19 +592,25 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 	// gesture
 	document.body.addEventListener('gesture', async (/** @type {CustomEvent} */ ev) => {
 		console.log(ev.detail.name);
-		if (ev.detail.name == 'L') {
+		if (ev.detail.name == 'L' || ev.detail.name == 'CLICK') {
 			let menu = /** @type {import("aframe").Entity} */(document.getElementById('mainMenu'));
 			if (!menu) {
 				menu = await instantiate('mainMenuTemplate');
 				menu.id = 'mainMenu';
 			}
 			let distance = 1.5;
-			let camera = document.querySelector('a-scene').camera;
-			let pos = camera.localToWorld(ev.detail.center.clone().normalize().multiplyScalar(distance));
-			let rot = new THREE.Euler().setFromQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())).toVector3().multiplyScalar(180 / Math.PI);
+			let sceneEl = document.querySelector('a-scene');
+			let cameraPosition = sceneEl.camera.getWorldPosition(new THREE.Vector3());
+			let pos = sceneEl.camera.localToWorld(ev.detail.center.clone().normalize().multiplyScalar(distance));
+
+			let tr = new THREE.Matrix4().lookAt(cameraPosition, pos, new THREE.Vector3(0, 1, 0));
+			let rot = new THREE.Euler().setFromRotationMatrix(tr).toVector3().multiplyScalar(180 / Math.PI);
+
 			menu.setAttribute('position', pos);
-			menu.setAttribute('rotation', rot);
 			menu.setAttribute('scale', { x: 0.2, y: 0.2, z: 0.2 });
+			if (sceneEl.is('vr-mode')) {
+				menu.object3D.setRotationFromMatrix(tr);
+			}
 		}
 		if (document.activeElement && document.activeElement != document.body) {
 			document.activeElement.dispatchEvent(new CustomEvent('gesture', { bubbles: false, detail: ev.detail }));

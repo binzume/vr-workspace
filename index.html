@@ -11,7 +11,7 @@
   <script src="libs/utils/gesture.js"></script>
   <script src="libs/utils/hand-controller.js"></script>
   <script src="js/workspace.js"></script>
-  <script src="apps/mediaplayer/googledrive.js"></script>
+  <script src="apps/mediaplayer/googledrive.js" defer></script>
   <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
 </head>
 
@@ -31,59 +31,56 @@
     <a id="env-empty" href="#empty" data-apptype='env'>env:Empty</a>
   </div>
 
+  <!-- menu pane -->
+  <script type='text/html' id="mainMenuTemplate">
+    <a-xywindow main-menu position="0 1 -1.5" title="Menu" width="5" height="0.6" scale="0.2 0.2 0.2" xycontainer="direction:column;spacing:0.05">
+      <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xybutton label="Apps" width="1" launch-on-click="appid:applist"></a-xybutton>
+        <a-xybutton label="Storage" width="1" launch-on-click="appid:app-media-selector"></a-xybutton>
+        <a-xybutton label="Console" width="1" launch-on-click="appid:app-console"></a-xybutton>
+        <a-xybutton name="exitVRButton" label="Exit VR" width="1"></a-xybutton>
+      </a-xycontainer>
+      <a-xycontainer search-box width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
+        <a-xyinput name="searchKeyword" width="3"></a-xyinput>
+        <a-xybutton name="searchButton" label="Go" width="1"></a-xybutton>
+      </a-xycontainer>
+      <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
+        <a-xylabel simple-clock width="3" height="0.6" value="0000-00-00 00:00:00"></a-xylabel>
+      </a-xycontainer>
+    </a-xywindow>
+  </script>
+
+  <!-- debug console -->
+  <script type='text/html' id="debugConsole">
+    <a-xywindow title="DebugLog" debug-log="log:debug-text" width="6" height="4" position="2 1 -3" scale="0.2 0.2 0.2">
+      <a-text name="debug-text" width="5" height="4" anchor="center" wrap-count="40" value=""></a-text>
+    </a-xywindow>
+  </script>
+
+  <!-- Apps -->
+  <script type='text/html' id="apps-panel">
+    <a-xywindow apps-panel xywindow="closable:false;background:true" position="0 0 -1.2" scale="0.15 0.15 0.15" title="Apps" width="5" height="6" xycontainer="direction:column">
+      <a-xyscroll width=5 height=5.2 scrollbar=false>
+        <a-entity name="apps-panel-list" xylist="" xyrect=""></a-entity>
+      </a-xyscroll>
+      <a-xycontainer width="5" height="0.8" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xybutton name="close-button" label="x" width="1"></a-xybutton>
+      </a-xycontainer>
+    </a-xywindow>
+  </script>
+
+  <script type='text/html' id="empty"></script>
+
   <a-scene fog="type: linear; color: #000; near:20;far:100;" renderer="antialias:true;">
-    <a-entity id='mouse-cursor' cursor="rayOrigin: mouse; fuse:false" gesture="" raycaster="objects:.collidable;far:5500"></a-entity>
+    <a-entity id='mouse-cursor' cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable;far:5500"></a-entity>
     <a-entity hand-controller=""></a-entity>
+
+    <a-assets></a-assets>
 
     <a-entity id='env'>
       <a-sky></a-sky>
-      <a-plane id='ground' wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='90 0 0' color="#111155"></a-plane>
+      <a-plane wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='90 0 0' color="#111155"></a-plane>
     </a-entity>
-
-    <a-assets>
-      <script type="text/plain">dummyForWorkaround</script>
-
-      <template id="empty"></template>
-
-      <!-- menu pane -->
-      <template id="mainMenuTemplate">
-        <a-xywindow main-menu window-locator="applyCameraPos:false" position="0 1 -1.5" title="Menu" width="5" height="0.6" scale="0.2 0.2 0.2" xycontainer="direction:column;spacing:0.05">
-          <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
-            <a-xybutton label="Apps" width="1" launch-on-click="appid:applist"></a-xybutton>
-            <a-xybutton label="Storage" width="1" launch-on-click="appid:app-media-selector"></a-xybutton>
-            <a-xybutton label="Console" width="1" launch-on-click="appid:app-console"></a-xybutton>
-            <a-xybutton name="exitVRButton" label="Exit VR" width="1"></a-xybutton>
-          </a-xycontainer>
-          <a-xycontainer search-box width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
-            <a-xyinput name="searchKeyword" width="3"></a-xyinput>
-            <a-xybutton name="searchButton" label="Go" width="1"></a-xybutton>
-          </a-xycontainer>
-          <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
-            <a-xylabel simple-clock width="3" height="0.6" value="0000-00-00 00:00:00"></a-xylabel>
-          </a-xycontainer>
-        </a-xywindow>
-      </template>
-
-      <!-- debug console -->
-      <template id="debugConsole">
-        <a-xywindow title="DebugLog" debug-log="log:debug-text" width="6" height="4" position="2 1 -3" scale="0.2 0.2 0.2">
-          <a-text name="debug-text" width="5" height="4" anchor="center" wrap-count="40" value=""></a-text>
-        </a-xywindow>
-      </template>
-
-      <!-- Apps -->
-      <template id="apps-panel">
-        <a-xywindow apps-panel xywindow="closable:false;background:true" position="0 1 -1.3" scale="0.15 0.15 0.15" title="Apps" width="5" height="6" xycontainer="direction:column">
-          <a-xyscroll width=5 height=5.2 scrollbar=false>
-            <a-entity name="apps-panel-list" xylist="" xyrect=""></a-entity>
-          </a-xyscroll>
-          <a-xycontainer width="5" height="0.8" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
-            <a-xybutton name="close-button" label="x" width="1"></a-xybutton>
-          </a-xycontainer>
-        </a-xywindow>
-      </template>
-
-    </a-assets>
 
     <a-entity id="camera-rig" position-controls="axismove:x" camera-control>
       <a-camera position="0 1.5 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
