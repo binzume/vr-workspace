@@ -18,16 +18,17 @@
 <body style="background-color: black; color:white;">
   <div id='applications' style='display:none'>
     <a id="applist" href="#apps-panel" class='hidden'>Apps</a>
+    <a id="main-menu" href="#mainMenuTemplate" class='hidden' data-wid='mainMenu'>MainMenu</a>
     <a id="app-calc" href="apps/calc/template.html">Calculator</a>
     <a id="app-media-selector" href="apps/mediaplayer/template.html#media-selector-template">Storage</a>
     <a id="app-media-player" href="apps/mediaplayer/template.html#media-player-template">MediaPlayer</a>
-    <a id="app-vnc" href="apps/vnc/template.html">VNC Client</a>
+    <a id="app-vnc" href="apps/vnc/template.html#app-vnc">VNC Client</a>
     <a id="app-vrm" href="apps/vrmviewer/template.html" class='hidden'>VRM Viewer</a>
-    <a id="app-vrm-blendShape" href="apps/vrmviewer/template.html">VRM BlendShape</a>
+    <a id="app-vrm-blendShape" href="apps/vrmviewer/template.html#app-vrm-blendShape">VRM BlendShape</a>
     <a id="app-console" href="#debugConsole" data-wid='debug-console'>Console</a>
-    <a id="env-rosso" href="apps/rosso/index.html#env" data-apptype='env'>env:ROSSO</a>
-    <a id="env-physics" href="apps/physics/index.html#env" data-apptype='env'>env:Physics</a>
-    <a id="env-default" href="#env" data-apptype='env'>env:Default</a>
+    <a id="env-rosso" href="apps/rosso/index.html" data-apptype='env'>env:ROSSO</a>
+    <a id="env-physics" href="apps/physics/index.html" data-apptype='env'>env:Physics</a>
+    <a id="env-default" href="index.html#env" data-apptype='env'>env:Default</a>
     <a id="env-empty" href="#empty" data-apptype='env'>env:Empty</a>
   </div>
 
@@ -57,7 +58,7 @@
     </a-xywindow>
   </script>
 
-  <!-- Apps -->
+  <!-- Apps menu -->
   <script type='text/html' id="apps-panel">
     <a-xywindow apps-panel xywindow="closable:false;background:true" position="0 0 -1.2" scale="0.15 0.15 0.15" title="Apps" width="5" height="6" xycontainer="direction:column">
       <a-xyscroll width=5 height=5.2 scrollbar=false>
@@ -69,16 +70,16 @@
     </a-xywindow>
   </script>
 
+  <!-- Empty app -->
   <script type='text/html' id="empty"></script>
 
-  <a-scene fog="type: linear; color: #25a; near:20;far:100;" renderer="antialias:true;">
+  <a-scene fog="type: linear; color: #25a; near:20;far:100;" background="color: #25a" renderer="antialias:true;highRefreshRate:true">
     <a-entity id='mouse-cursor' cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable;far:5500"></a-entity>
     <a-entity hand-controller=""></a-entity>
 
     <a-assets></a-assets>
 
     <a-entity id='env'>
-      <a-sky></a-sky>
       <a-plane wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='90 0 0' color="#aaaaaa"></a-plane>
     </a-entity>
 
@@ -86,10 +87,9 @@
       <a-camera position="0 1.5 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
       <a-entity laser-controls="hand: right" id="rightHand" raycaster="far:Infinity;objects:.collidable" gesture="button:grip"></a-entity>
       <a-entity laser-controls="hand: left" id="leftHand" raycaster="far:Infinity;objects:.collidable"></a-entity>
+
       <!-- kbd -->
-      <a-entity position="0 0.7 -1" scale='0.22 0.22 0.22'>
-        <a-xykeyboard ime=true></a-xykeyboard>
-      </a-entity>
+      <a-xykeyboard ime=true scale='0.22 0.22 0.22' position="0 1 -1" rotation='-30 0 0'></a-xykeyboard>
     </a-entity>
 
   </a-scene>

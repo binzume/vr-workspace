@@ -27,22 +27,29 @@ class AppManager {
 				apps.push(app);
 			}
 		}
+		this.apps = apps.concat(this._loadFromLocalStorage());
+	}
+
+	/**
+	 * @returns {AppInfo[]}
+	 */
+	_loadFromLocalStorage() {
 		try {
 			let s = localStorage.getItem('vrApps');
 			if (s !== null) {
-				apps = apps.concat(JSON.parse(s));
+				return JSON.parse(s);
 			}
 		} catch (e) {
 			console.log('error', e);
 		}
-		this.apps = apps;
+		return [];
 	}
 
 	/**
 	 * @param {string} id 
 	 * @param {Element} sceneEl
 	 */
-	async launch(id, sceneEl = null) {
+	async launch(id, sceneEl = null, options = {}) {
 		let app = this.getAppById(id);
 		if (app == null) {
 			console.log('app not found:' + id);
@@ -52,11 +59,11 @@ class AppManager {
 			console.log('already exists:' + app.wid);
 			return null;
 		}
-		let el = await instantiate(app.id, sceneEl);
+		let el = await this.instantiate(app.url, app.type, sceneEl);
 		if (app.wid) {
 			el.id = app.wid;
 		}
-		if (el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
+		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
 		return el;
@@ -79,6 +86,11 @@ class AppManager {
 			return false;
 		}
 		this.apps.push(app);
+		if (save) {
+			let apps = this._loadFromLocalStorage();
+			apps.push(app);
+			localStorage.setItem('vrApps', JSON.stringify(apps));
+		}
 		return true;
 	}
 
@@ -92,6 +104,83 @@ class AppManager {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * @param {string} url
+	 * @param {string} apptype
+	 * @param {*} [parent]
+	 */
+	async instantiate(url, apptype, parent) {
+		let [url1, id] = url.split('#');
+		let base = new URL(location.href);
+		let modules = [];
+		let template;
+
+		if (url1 == '') {
+			template = document.getElementById(id);
+		} else {
+			let assets = document.querySelector('a-assets');
+			let response = await new Promise((resolve, reject) => assets.fileLoader.load(url1, resolve, null, reject));
+			let doc = new DOMParser().parseFromString(response, 'text/html');
+			let baseEl = doc.createElement('base');
+			baseEl.setAttribute('href', url);
+			doc.head.append(baseEl);
+			base = new URL(url);
+
+			for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {
+				if (img.id && !document.getElementById(img.id)) {
+					img.src = img.src; // apply base url.
+					assets.appendChild(document.importNode(img, false));
+				}
+			}
+			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
+				modules.push(script.src);
+			}
+			for (let el of doc.querySelectorAll('[gltf-model]')) {
+				let attr = el.getAttribute('gltf-model');
+				let m = attr.match(/url\(([^\)]+)\)/);
+				if (m) {
+					el.setAttribute('gltf-model', attr.replace(m[1], new URL(m[1], base)));
+				}
+			}
+			id = id || apptype;
+			template = doc.getElementById(id);
+
+			// TODO: remove this
+			if (apptype == 'env') {
+				let srcSceneEl = doc.querySelector('a-scene');
+				if (srcSceneEl) {
+					let sceneEl = parent ? parent.sceneEl : document.querySelector('a-scene');
+					for (let attr of ['fog', 'background']) {
+						if (srcSceneEl.hasAttribute(attr)) {
+							sceneEl.setAttribute(attr, srcSceneEl.getAttribute(attr));
+						}
+					}
+				}
+			}
+		}
+
+		// TODO: remove this
+		if (apptype == 'env') {
+			parent = document.querySelector('#env');
+			while (parent.firstChild) {
+				parent.removeChild(parent.lastChild);
+			}
+		}
+
+		for (let mod of modules) {
+			await import(mod);
+		}
+
+		// TODO: document.importNode()
+		let wrapper = document.createElement('div');
+		wrapper.innerHTML = template.innerHTML;
+		let first = wrapper.firstElementChild;
+		for (let el of Array.from(wrapper.children)) {
+			(parent || document.querySelector('a-scene')).appendChild(el);
+		}
+		return /** @type {import("aframe").Entity} */ (first);
 	}
 }
 
@@ -300,7 +389,10 @@ AFRAME.registerComponent('camera-control', {
 		});
 	},
 	resetPosition() {
-		this.el.sceneEl.querySelector('a-sky').object3D.visible = !this.el.sceneEl.is('ar-mode');
+		let sky = this.el.sceneEl.querySelector('a-sky');
+		if (sky) {
+			sky.object3D.visible = !this.el.sceneEl.is('ar-mode');
+		}
 		if (this.el.sceneEl.is('vr-mode')) {
 			this.el.setAttribute('position', this.data.vrHomePosition);
 		} else {
@@ -484,81 +576,6 @@ AFRAME.registerComponent('window-locator', {
 });
 
 
-// utils
-/**
- * 
- * @param {string} id 
- * @param {*} [parent]
- */
-async function instantiate(id, parent) {
-	let template = document.getElementById(id);
-	let apptype = template.dataset.apptype;
-	let base = new URL(location.href);
-	let modules = [];
-	if (template instanceof HTMLAnchorElement) {
-		let url = template.href;
-		let assets = document.querySelector('a-assets');
-		let response = await new Promise((resolve, reject) => assets.fileLoader.load(url.replace(/#.*$/, ''), resolve, null, reject));
-		let doc = new DOMParser().parseFromString(response, 'text/html');
-		let baseEl = doc.createElement('base');
-		baseEl.setAttribute('href', url);
-		doc.head.append(baseEl);
-		base = new URL(url);
-
-		for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {
-			if (img.id && !document.getElementById(img.id)) {
-				img.src = img.src; // apply base url.
-				assets.appendChild(document.importNode(img, false));
-			}
-		}
-		for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
-			modules.push(script.src);
-		}
-		for (let el of doc.querySelectorAll('[gltf-model]')) {
-			let attr = el.getAttribute('gltf-model');
-			let m = attr.match(/url\(([^\)]+)\)/);
-			if (m) {
-				el.setAttribute('gltf-model', attr.replace(m[1], new URL(m[1], base)));
-			}
-		}
-		template = doc.getElementById(base.hash.length > 1 ? base.hash.substr(1) : id);
-
-		// TODO: remove this
-		if (apptype == 'env') {
-			let scene = doc.querySelector('a-scene');
-			if (scene && scene.hasAttribute('fog')) {
-				document.querySelector('a-scene').setAttribute('fog', scene.getAttribute('fog'));
-			}
-		}
-	}
-	// TODO: remove this
-	if (apptype == 'env') {
-		parent = document.querySelector('#env');
-		while (parent.firstChild) {
-			parent.removeChild(parent.lastChild);
-		}
-	}
-
-	let imp = template.dataset.import;
-	if (imp) {
-		for (let mod of imp.split(';')) {
-			modules.push((new URL(mod, base)).toString());
-		}
-	}
-	for (let mod of modules) {
-		await import(mod);
-	}
-
-	// TODO: document.importNode()
-	let wrapper = document.createElement('div');
-	wrapper.innerHTML = template.innerHTML;
-	let first = wrapper.firstElementChild;
-	for (let el of Array.from(wrapper.children)) {
-		(parent || document.querySelector('a-scene')).appendChild(el);
-	}
-	return /** @type {import("aframe").Entity} */ (first);
-}
-
 window.addEventListener('DOMContentLoaded', async (ev) => {
 	appManager.loadApps('#applications>a');
 	appManager.contentHandlers.push((item) => {
@@ -587,7 +604,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		return false;
 	});
 
-	(await instantiate('mainMenuTemplate')).id = 'mainMenu';
+	appManager.launch('main-menu', null, { disableWindowLocator: true });
 
 	// gesture
 	document.body.addEventListener('gesture', async (/** @type {CustomEvent} */ ev) => {
@@ -595,21 +612,21 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		if (ev.detail.name == 'L' || ev.detail.name == 'CLICK') {
 			let menu = /** @type {import("aframe").Entity} */(document.getElementById('mainMenu'));
 			if (!menu) {
-				menu = await instantiate('mainMenuTemplate');
-				menu.id = 'mainMenu';
+				menu = await appManager.launch('main-menu', null, { disableWindowLocator: true });
+				menu.setAttribute('scale', { x: 0.2, y: 0.2, z: 0.2 });
 			}
 			let distance = 1.5;
 			let sceneEl = document.querySelector('a-scene');
-			let cameraPosition = sceneEl.camera.getWorldPosition(new THREE.Vector3());
-			let pos = sceneEl.camera.localToWorld(ev.detail.center.clone().normalize().multiplyScalar(distance));
+			let camera = sceneEl.camera;
+			let targetObj = menu.object3D;
+			let tr = new THREE.Matrix4().getInverse(targetObj.parent.matrixWorld).multiply(camera.matrixWorld);
+			let pos = ev.detail.center.clone().normalize().multiplyScalar(distance).applyMatrix4(tr);
 
-			let tr = new THREE.Matrix4().lookAt(cameraPosition, pos, new THREE.Vector3(0, 1, 0));
-			let rot = new THREE.Euler().setFromRotationMatrix(tr).toVector3().multiplyScalar(180 / Math.PI);
-
-			menu.setAttribute('position', pos);
-			menu.setAttribute('scale', { x: 0.2, y: 0.2, z: 0.2 });
+			targetObj.position.copy(pos);
 			if (sceneEl.is('vr-mode')) {
-				menu.object3D.setRotationFromMatrix(tr);
+				let cameraPosition = new THREE.Vector3().applyMatrix4(tr);
+				tr.lookAt(cameraPosition, pos, new THREE.Vector3(0, 1, 0));
+				targetObj.setRotationFromMatrix(tr);
 			}
 		}
 		if (document.activeElement && document.activeElement != document.body) {
