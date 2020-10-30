@@ -11,6 +11,8 @@ class AppManager {
 		this.apps = [];
 		/** @type {((c:ContentInfo) => boolean)[]} */
 		this.contentHandlers = [];
+		/** @type {Set<string>} */
+		this.loadedModules = new Set()
 	}
 
 	/**
@@ -112,30 +114,30 @@ class AppManager {
 	 * @param {*} [parent]
 	 */
 	async instantiate(url, apptype, parent) {
-		let [url1, id] = url.split('#');
+		let [srcUrl, id] = url.split('#');
 		let base = new URL(location.href);
-		let modules = [];
+		let srcSceneEl = null;
 		let template;
 
-		if (url1 == '') {
+		if (srcUrl == '') {
 			template = document.getElementById(id);
 		} else {
 			let assets = document.querySelector('a-assets');
-			let response = await new Promise((resolve, reject) => assets.fileLoader.load(url1, resolve, null, reject));
+			let response = await new Promise((resolve, reject) => assets.fileLoader.load(srcUrl, resolve, null, reject));
 			let doc = new DOMParser().parseFromString(response, 'text/html');
 			let baseEl = doc.createElement('base');
 			baseEl.setAttribute('href', url);
 			doc.head.append(baseEl);
 			base = new URL(url);
 
+			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
+				await this._loadModule(script.src, script.id);
+			}
 			for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {
 				if (img.id && !document.getElementById(img.id)) {
 					img.src = img.src; // apply base url.
 					assets.appendChild(document.importNode(img, false));
 				}
-			}
-			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
-				modules.push(script.src);
 			}
 			for (let el of doc.querySelectorAll('[gltf-model]')) {
 				let attr = el.getAttribute('gltf-model');
@@ -146,31 +148,22 @@ class AppManager {
 			}
 			id = id || apptype;
 			template = doc.getElementById(id);
+			srcSceneEl = doc.querySelector('a-scene');
+		}
 
-			// TODO: remove this
-			if (apptype == 'env') {
-				let srcSceneEl = doc.querySelector('a-scene');
-				if (srcSceneEl) {
-					let sceneEl = parent ? parent.sceneEl : document.querySelector('a-scene');
-					for (let attr of ['fog', 'background']) {
-						if (srcSceneEl.hasAttribute(attr)) {
-							sceneEl.setAttribute(attr, srcSceneEl.getAttribute(attr));
-						}
+		if (apptype == 'env') {
+			if (srcSceneEl) {
+				let sceneEl = parent ? parent.sceneEl : document.querySelector('a-scene');
+				for (let attr of ['fog', 'background']) {
+					if (srcSceneEl.hasAttribute(attr)) {
+						sceneEl.setAttribute(attr, srcSceneEl.getAttribute(attr));
 					}
 				}
 			}
-		}
-
-		// TODO: remove this
-		if (apptype == 'env') {
 			parent = document.querySelector('#env');
 			while (parent.firstChild) {
 				parent.removeChild(parent.lastChild);
 			}
-		}
-
-		for (let mod of modules) {
-			await import(mod);
 		}
 
 		// TODO: document.importNode()
@@ -181,6 +174,24 @@ class AppManager {
 			(parent || document.querySelector('a-scene')).appendChild(el);
 		}
 		return /** @type {import("aframe").Entity} */ (first);
+	}
+
+	/**
+	 * 
+	 * @param {string} src 
+	 * @param {string} [id] 
+	 */
+	async _loadModule(src, id) {
+		if (id) {
+			if (this.loadedModules.has(id)) {
+				return;
+			}
+			this.loadedModules.add(id);
+		}
+		if (!this.loadedModules.has(src)) {
+			this.loadedModules.add(src);
+			await import(src);
+		}
 	}
 }
 
