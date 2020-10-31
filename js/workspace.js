@@ -30,6 +30,15 @@ class AppManager {
 			}
 		}
 		this.apps = apps.concat(this._loadFromLocalStorage());
+
+		for (let script of document.querySelectorAll('head>script')) {
+			if (script.src) {
+				this.loadedModules.add(script.src);
+			}
+			if (script.id) {
+				this.loadedModules.add(script.id);
+			}
+		}
 	}
 
 	/**
@@ -124,13 +133,19 @@ class AppManager {
 		} else {
 			let assets = document.querySelector('a-assets');
 			let response = await new Promise((resolve, reject) => assets.fileLoader.load(srcUrl, resolve, null, reject));
-			let doc = new DOMParser().parseFromString(response, 'text/html');
+			let doc = new DOMParser().parseFromString(response.replaceAll('${baseUrl}', srcUrl.replace(/\/[^/]+$/, '/')), 'text/html');
 			let baseEl = doc.createElement('base');
-			baseEl.setAttribute('href', url);
+			baseEl.setAttribute('href', srcUrl);
 			doc.head.append(baseEl);
-			base = new URL(url);
+			base = new URL(srcUrl);
 
-			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('script.required'))) {
+			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('head>script[src]'))) {
+				for (let [name, id] of [['aframe-master.min.js', 'script-aframe'], ['xylayout-all.min.js', 'script-xylayout']]) {
+					if (!script.id && script.src.includes(name)) {
+						console.warn(srcUrl, "id:" + id);
+						script.id = id;
+					}
+				}
 				await this._loadModule(script.src, script.id);
 			}
 			for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {

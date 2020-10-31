@@ -5,10 +5,10 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Physics Test</title>
-  <script src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
-  <script src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
-  <script src="https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js" class='required'></script>
-  <script src="draggable-body.js" class='required'></script>
+  <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
+  <script id="script-xylayout" src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script id='script-physics' src="https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+  <script id='script-draggable-body' src="draggable-body.js"></script>
 </head>
 
 <body style="background-color: black; color:white;">
@@ -18,10 +18,10 @@
     <a-entity id="env">
       <a-plane id='ground' wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='90 0 0' static-body="shape:none" shape="shape:box;halfExtents:5 5 5;offset:0 0 5"></a-plane>
 
-      <a-box width="1" height="0.1" depth="0.5" position="1.5 0.3 -1" rotation="0 0 10" color="red" draggable-body static-body></a-box>
-      <a-box width="1" height="0.1" depth="0.5" position="-1.5 0 -1" rotation="0 0 -10" color="red" draggable-body static-body></a-box>
-      <a-box width="0.1" height="0.1" depth="0.1" position="1.0 0.05 -1.1" color="red" draggable-body static-body></a-box>
-      <a-box width="0.1" height="0.1" depth="0.1" position="0.5 0.3 1" color="red" draggable-body static-body></a-box>
+      <a-box width="1" height="0.1" depth="0.5" position="1.5 0.3 -1" rotation="0 0 15" color="gray" draggable-body static-body></a-box>
+      <a-box width="1" height="0.1" depth="0.5" position="-1.5 0.1 -1" rotation="0 0 -15" color="gray" draggable-body static-body></a-box>
+      <a-box width="0.1" height="0.1" depth="0.1" position="1.0 0.05 -1.1" color="gray" draggable-body static-body></a-box>
+      <a-box width="0.1" height="0.1" depth="0.1" position="1 0.3 0" color="gray" draggable-body static-body></a-box>
       <a-sphere radius="0.2" position="1.4 0.7 -1" color="green" draggable-body dynamic-body="mass:1"></a-sphere>
 
       <a-box width="0.1" height="0.1" depth="0.1" position="0.5 0.5 -0.5" color="green" draggable-body dynamic-body="mass:1"></a-box>
@@ -29,7 +29,7 @@
       <a-box width="0.1" height="0.1" depth="0.1" position="-1 0.5 0" color="green" draggable-body dynamic-body="mass:1"></a-box>
       <a-box width="0.1" height="0.1" depth="0.1" position="-1 1 0" color="green" draggable-body dynamic-body="mass:1"></a-box>
       <a-sphere radius="0.1" position="-1 0.2 0" color="green" draggable-body dynamic-body="mass:1"></a-sphere>
-      <a-box width="20" height="20" depth="20" position="0 15 40" rotation="10 20 30" color="gray" static-body></a-box>
+      <a-box width="20" height="20" depth="20" position="0 10 40" rotation="10 20 30" color="gray" static-body></a-box>
     </a-entity>
 
     <a-entity id="camera-rig" position="0 0 3">
