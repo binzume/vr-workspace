@@ -54,8 +54,9 @@
 
   <!-- debug console -->
   <script type='text/html' id="debugConsole">
-    <a-xywindow title="DebugLog" debug-log="log:debug-text" width="6" height="4" position="2 1 -3" scale="0.2 0.2 0.2">
-      <a-text name="debug-text" width="5" height="4" anchor="center" wrap-count="40" value=""></a-text>
+    <a-xywindow title="Console" debug-log="log:debug-text" xywindow="background:true" width="6" height="4.5" position="2 1 -1.5" scale="0.2 0.2 0.2" xycontainer="direction:column">
+      <a-xylabel name="debug-text" width="6" height="4" anchor="center" wrap-count="50" value=""></a-xylabel>
+      <a-xyinput name="command" width="6" height="0.5"></a-xyinput>
     </a-xywindow>
   </script>
 

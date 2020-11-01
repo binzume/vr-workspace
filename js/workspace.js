@@ -331,6 +331,15 @@ AFRAME.registerComponent('debug-log', {
 		this._onerror = this._onerror.bind(this);
 		window.addEventListener('error', this._onerror);
 		window.addEventListener('unhandledrejection', this._onerror);
+
+		let commandEl = this._elByName('command');
+		commandEl && commandEl.addEventListener('keydown', (ev) => {
+			if (ev.code == 'Enter') {
+				console.log('>', commandEl.value);
+				console.log(eval(commandEl.value));
+				commandEl.value = '';
+			}
+		});
 	},
 	_addLog(...msg) {
 		this.orgLog(...msg);
@@ -341,7 +350,7 @@ AFRAME.registerComponent('debug-log', {
 		}
 		this.log.push(header + msg.map(m => String(m)).join(' '));
 		if (this.log.length > this.data.lines) this.log.shift();
-		let logEl = this.el.querySelector('[name=debug-text]');
+		let logEl = this._elByName('debug-text');
 		logEl.setAttribute('value', this.log.join("\n"));
 	},
 	_onerror(ev) {
@@ -351,6 +360,12 @@ AFRAME.registerComponent('debug-log', {
 		window.removeEventListener('error', this._onerror);
 		window.removeEventListener('unhandledrejection', this._onerror);
 		console.log = this.orgLog;
+	},
+	/**
+	 * @param {string} name 
+	 */
+	_elByName(name) {
+		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
 	}
 });
 
@@ -495,7 +510,6 @@ AFRAME.registerComponent('position-controls', {
 		}
 		let changed = [];
 		el.addEventListener('gripdown', ev => {
-			console.log('gripdown');
 			document.querySelectorAll("[xy-drag-control]").forEach(el => {
 				el.components['xy-drag-control'].postProcess = (targetObj, /** @type {CustomEvent} */ ev) => {
 					let { origin, direction } = ev.detail.raycaster.ray;
