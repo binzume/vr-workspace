@@ -2,7 +2,7 @@
 
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /** 
- * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string|null;}} AppInfo
+ * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;}} AppInfo
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
  */
 class AppManager {
@@ -12,7 +12,7 @@ class AppManager {
 		/** @type {((c:ContentInfo) => boolean)[]} */
 		this.contentHandlers = [];
 		/** @type {Set<string>} */
-		this.loadedModules = new Set()
+		this.loadedModules = new Set();
 	}
 
 	/**
@@ -133,7 +133,7 @@ class AppManager {
 		} else {
 			let assets = document.querySelector('a-assets');
 			let response = await new Promise((resolve, reject) => assets.fileLoader.load(srcUrl, resolve, null, reject));
-			let doc = new DOMParser().parseFromString(response.replaceAll('${baseUrl}', srcUrl.replace(/\/[^/]+$/, '/')), 'text/html');
+			let doc = new DOMParser().parseFromString(response.replace(/\$\{baseUrl\}/g, srcUrl.replace(/\/[^/]+$/, '/')), 'text/html');
 			let baseEl = doc.createElement('base');
 			baseEl.setAttribute('href', srcUrl);
 			doc.head.append(baseEl);
@@ -335,8 +335,11 @@ AFRAME.registerComponent('debug-log', {
 		let commandEl = this._elByName('command');
 		commandEl && commandEl.addEventListener('keydown', (ev) => {
 			if (ev.code == 'Enter') {
-				console.log('>', commandEl.value);
-				console.log(eval(commandEl.value));
+				let cmd = commandEl.value;
+				console.log('>', cmd);
+				if (cmd) {
+					console.log(eval(cmd));
+				}
 				commandEl.value = '';
 			}
 		});
@@ -354,7 +357,11 @@ AFRAME.registerComponent('debug-log', {
 		logEl.setAttribute('value', this.log.join("\n"));
 	},
 	_onerror(ev) {
-		this._addLog("ERROR: " + ev.reason ? (ev.reason.message + ' ' + ev.reason.stack) : (ev.message + ev.filename + ':' + ev.line));
+		let msg = ev.reason ? ev.reason.message + ' ' + ev.reason.stack : ev.message;
+		if (ev.filename) {
+			msg += ` ${ev.filename}:${ev.line}`;
+		}
+		this._addLog("ERROR: " + msg);
 	},
 	remove() {
 		window.removeEventListener('error', this._onerror);
@@ -662,11 +669,14 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 			let tr = new THREE.Matrix4().getInverse(targetObj.parent.matrixWorld).multiply(camera.matrixWorld);
 			let pos = ev.detail.center.clone().normalize().multiplyScalar(distance).applyMatrix4(tr);
 
-			targetObj.position.copy(pos);
+			menu.setAttribute('position', pos);
 			if (sceneEl.is('vr-mode')) {
-				let cameraPosition = new THREE.Vector3().applyMatrix4(tr);
-				tr.lookAt(cameraPosition, pos, new THREE.Vector3(0, 1, 0));
-				targetObj.setRotationFromMatrix(tr);
+				let cameraPosition = new THREE.Vector3();
+				let cameraQuaternion = new THREE.Quaternion();
+				let tmp = new THREE.Vector3();
+				tr.decompose(cameraPosition, cameraQuaternion, tmp);
+				tr.lookAt(cameraPosition, pos, tmp.set(0, 1, 0));
+				targetObj.setRotationFromQuaternion(cameraQuaternion);
 			}
 		}
 		if (document.activeElement && document.activeElement != document.body) {
