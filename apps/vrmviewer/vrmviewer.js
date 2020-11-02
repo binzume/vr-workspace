@@ -24,16 +24,8 @@ AFRAME.registerComponent('vrm-select', {
 				el.destroy();
 				el = null;
 			}
-			if (ev.detail.name == 'B') {
-				// Bone edit
-				if (el.hasAttribute('vrm-poser')) {
-					el.removeAttribute('vrm-poser');
-				} else {
-					el.removeAttribute('vrm-bvh');
-					el.setAttribute('vrm-poser', {});
-				}
-			} else if (ev.detail.name == 'RECT') {
-				let blendShapeWindow = await instantiate('app-vrm-blendShape');
+			if (ev.detail.name == 'RECT') {
+				let blendShapeWindow = await instantiate('app-vrm-control-panel');
 				blendShapeWindow.setAttribute('pose-editor-window', 'vrm', el);
 			} else if (ev.detail.name == 'V') {
 				// saVe
@@ -57,13 +49,118 @@ AFRAME.registerComponent('vrm-select', {
 	}
 });
 
-AFRAME.registerComponent('pose-editor-window', {
-	schema: {
-		vrm: { type: 'selector', default: '[vrm]' },
-	},
+AFRAME.registerComponent('vrm-control-panel', {
+	schema: {},
 	init() {
-		let listEl = this.el.querySelector('[name=item-list]');
-		let list = this.list = listEl.components.xylist;
+		this._elByName('blink-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.setAttribute('vrm', 'blink', ev.detail.value);
+		});
+		this._elByName('lookat-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.setAttribute('vrm', 'lookAt', ev.detail.value ? 'a-camera' : null);
+		});
+		this._elByName('first-person-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.setAttribute('vrm', 'firstPerson', ev.detail.value);
+		});
+		this._elByName('physics-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.setAttribute('vrm', 'enablePhysics', ev.detail.value);
+		});
+		this._elByName('skeleton-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			if (ev.detail.value) {
+				this.vrmEl.setAttribute('vrm-skeleton', {});
+			} else {
+				this.vrmEl.removeAttribute('vrm-skeleton');
+			}
+		});
+		this._elByName('pose-edit-toggle').addEventListener('change', (ev) => {
+			if (!this.vrmEl) { return; }
+			if (ev.detail.value) {
+				this.vrmEl.removeAttribute('vrm-bvh');
+				this.vrmEl.setAttribute('vrm-poser', {});
+			} else {
+				this.vrmEl.removeAttribute('vrm-poser');
+			}
+		});
+
+		// Pose save/load/reset
+		this._elByName('pose-save-button').addEventListener('click', (ev) => {
+			if (!this.vrmEl) { return; }
+			let poseJson = JSON.stringify(vrmEl.components.vrm.avatar.getPose(true));
+			localStorage.setItem('vrm-pose0', poseJson);
+		});
+		this._elByName('pose-load-button').addEventListener('click', (ev) => {
+			if (!this.vrmEl) { return; }
+			let poseJson = localStorage.getItem('vrm-pose0');
+			if (poseJson) {
+				this.vrmEl.removeAttribute('vrm-bvh');
+				if (this.vrmEl.hasAttribute('vrm-poser')) {
+					this.vrmEl.components['vrm-poser'].setPoseData(JSON.parse(poseJson));
+				} else {
+					this.vrmEl.components.vrm.avatar.setPose(JSON.parse(poseJson));
+				}
+			}
+		});
+		this._elByName('pose-reset-button').addEventListener('click', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.removeAttribute('vrm-bvh');
+			this.vrmEl.components.vrm.avatar.restPose();
+		});
+
+		this._elByName('unload-button').addEventListener('click', (ev) => {
+			if (!this.vrmEl) { return; }
+			this.vrmEl.parentNode.removeChild(this.vrmEl);
+			this._setVrmEl(document.querySelector('[vrm]'));
+		});
+
+		this._initBlendShapeList();
+
+		this._onFocusInEvent = (ev) => {
+			if (ev.target.hasAttribute('vrm')) {
+				this._setVrmEl(ev.target);
+			}
+		};
+		this._onModelLoaded = (ev) => this._setAvatar(ev.detail.avatar);
+		document.body.addEventListener('focusin', this._onFocusInEvent);
+		this._setVrmEl(document.querySelector('[vrm]'));
+	},
+	remove() {
+		document.body.removeEventListener('focusin', this._onFocusInEvent);
+		this._setVrmEl(null);
+	},
+	_setVrmEl(vrmEl) {
+		if (this.vrmEl) {
+			this.vrmEl.removeEventListener('model-loaded', this._onModelLoaded);
+		}
+		this.vrmEl = vrmEl;
+		if (vrmEl == null) {
+			return;
+		}
+		vrmEl.addEventListener('model-loaded', this._onModelLoaded);
+		if (vrmEl.components.vrm.avatar) {
+			this._setAvatar(vrmEl.components.vrm.avatar);
+		}
+		let attrs = vrmEl.getAttribute('vrm');
+		if (!attrs) {
+			return;
+		}
+		this._elByName('blink-toggle').value = attrs.blink;
+		this._elByName('lookat-toggle').value = attrs.lookAt != null;
+		this._elByName('physics-toggle').value = attrs.enablePhysics;
+		this._elByName('first-person-toggle').value = attrs.firstPerson;
+		this._elByName('pose-edit-toggle').value = vrmEl.hasAttribute('vrm-poser');
+		this._elByName('skeleton-toggle').value = vrmEl.hasAttribute('vrm-skeleton');
+	},
+	_setAvatar(avatar) {
+		this.vrm = avatar;
+		this._elByName('blend-shape-list').components.xylist.setContents(Object.keys(this.vrm.blendShapes));
+	},
+	_initBlendShapeList() {
+		let listEl = this._elByName('blend-shape-list');
+		let list = listEl.components.xylist;
 		let self = this;
 		list.setAdapter({
 			create() {
@@ -86,28 +183,15 @@ AFRAME.registerComponent('pose-editor-window', {
 				el.querySelector('a-xyrange').value = self.vrm.getBlendShapeWeight(contents[position]) * 100;
 			}
 		});
-		this.el.querySelector('[name=reset-all-morph]').addEventListener('click', (ev) => {
-			self.vrm.resetBlendShape();
-			this.list.setContents(this.blendShapeNames);
+		this._elByName('blend-shape-reset').addEventListener('click', (ev) => {
+			this.vrm.resetBlendShape();
+			list.setContents(Object.keys(this.vrm.blendShapes));
 		});
-		this.onModelLoaded = (ev) => this.updateAvatar(ev.detail.avatar);
 	},
-	update() {
-		this.remove();
-		this.vrmEl = this.data.vrm;
-		this.vrmEl.addEventListener('model-loaded', this.onModelLoaded);
-		if (this.vrmEl.components.vrm.avatar) {
-			this.updateAvatar(this.vrmEl.components.vrm.avatar);
-		}
-	},
-	updateAvatar(avatar) {
-		this.vrm = avatar;
-		this.blendShapeNames = Object.keys(avatar.blendShapes);
-		this.list.setContents(this.blendShapeNames);
-	},
-	remove() {
-		if (this.vrmEl) {
-			this.vrmEl.removeEventListener('model-loaded', this.onModelLoaded);
-		}
+	/**
+	 * @param {string} name 
+	 */
+	_elByName(name) {
+		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
 	}
 });

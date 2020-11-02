@@ -18,23 +18,23 @@
 <body style="background-color: black; color:white;">
   <div id='applications' style='display:none'>
     <a id="applist" href="#apps-panel" class='hidden'>Apps</a>
-    <a id="main-menu" href="#mainMenuTemplate" class='hidden' data-wid='mainMenu'>MainMenu</a>
+    <a id="main-menu" href="#main-menu-template" class='hidden' data-wid='mainMenu'>MainMenu</a>
     <a id="app-calc" href="apps/calc/template.html">Calculator</a>
+    <a id="app-console" href="#debug-console-template" data-wid='debug-console'>Console</a>
     <a id="app-media-selector" href="apps/mediaplayer/template.html#media-selector-template">Storage</a>
     <a id="app-media-player" href="apps/mediaplayer/template.html#media-player-template">MediaPlayer</a>
     <a id="app-vnc" href="apps/vnc/template.html#app-vnc">VNC Client</a>
     <a id="app-vrm" href="apps/vrmviewer/template.html" class='hidden'>VRM Viewer</a>
-    <a id="app-vrm-blendShape" href="apps/vrmviewer/template.html#app-vrm-blendShape">VRM BlendShape</a>
-    <a id="app-console" href="#debugConsole" data-wid='debug-console'>Console</a>
+    <a id="app-vrm-control-panel" href="apps/vrmviewer/template.html#app-vrm-control-panel" data-wid='vrm-control-panel'>VRM ControlPanel</a>
     <a id="env-rosso" href="apps/rosso/index.html" data-apptype='env'>env:ROSSO</a>
     <a id="env-starrysky" href="apps/starrysky/template.html" data-apptype='env'>env:StarrySky</a>
     <a id="env-physics" href="apps/physics/index.html" data-apptype='env'>env:Physics</a>
-    <a id="env-default" href="index.html#env" data-apptype='env'>env:Default</a>
+    <a id="env-default" href="index.html" data-apptype='env'>env:Default</a>
     <a id="env-empty" href="#empty" data-apptype='env'>env:Empty</a>
   </div>
 
   <!-- menu pane -->
-  <script type='text/html' id="mainMenuTemplate">
+  <script type='text/html' id="main-menu-template">
     <a-xywindow main-menu xywindow="background:true" position="0 1 -1.5" title="Menu" width="5" height="1.8" scale="0.2 0.2 0.2" xycontainer="direction:column;spacing:0.05">
       <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
         <a-xybutton label="Apps" width="1" launch-on-click="appid:applist"></a-xybutton>
@@ -53,10 +53,10 @@
   </script>
 
   <!-- debug console -->
-  <script type='text/html' id="debugConsole">
-    <a-xywindow title="Console" debug-log="log:debug-text" xywindow="background:true" width="6" height="4.5" position="2 1 -1.5" scale="0.2 0.2 0.2" xycontainer="direction:column">
-      <a-xylabel name="debug-text" width="6" height="4" anchor="center" wrap-count="50" value=""></a-xylabel>
-      <a-xyinput name="command" width="6" height="0.5"></a-xyinput>
+  <script type='text/html' id="debug-console-template">
+    <a-xywindow title="Console" debug-log="log:debug-text" xywindow="background:true" width="8" height="4.5" position="1 1 -1.5" scale="0.2 0.2 0.2" xycontainer="direction:column">
+      <a-xylabel name="debug-text" width="8" height="4" anchor="center" wrap-count="80" value=""></a-xylabel>
+      <a-xyinput name="command" width="8" height="0.5"></a-xyinput>
     </a-xywindow>
   </script>
 
@@ -91,7 +91,7 @@
       <a-entity laser-controls="hand: left" id="leftHand" raycaster="far:Infinity;objects:.collidable"></a-entity>
 
       <!-- kbd -->
-      <a-xykeyboard ime=true scale='0.22 0.22 0.22' position="0 1 -1" rotation='-30 0 0'></a-xykeyboard>
+      <a-xykeyboard ime="true" distance="0.7" scale='0.22 0.22 0.22' position="0 0.9 -1" rotation='-30 0 0'></a-xykeyboard>
     </a-entity>
 
   </a-scene>
