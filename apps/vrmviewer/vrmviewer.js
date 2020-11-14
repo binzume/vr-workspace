@@ -23,10 +23,6 @@ AFRAME.registerComponent('vrm-select', {
 				el.parentNode.removeChild(el);
 				el.destroy();
 				el = null;
-			}
-			if (ev.detail.name == 'RECT') {
-				let blendShapeWindow = await instantiate('app-vrm-control-panel');
-				blendShapeWindow.setAttribute('pose-editor-window', 'vrm', el);
 			} else if (ev.detail.name == 'V') {
 				// saVe
 				if (el.hasAttribute('vrm-poser')) {
@@ -87,14 +83,18 @@ AFRAME.registerComponent('vrm-control-panel', {
 		});
 
 		// Pose save/load/reset
-		this._elByName('pose-save-button').addEventListener('click', (ev) => {
+		let poseNames = ['pose01', 'pose02', 'pose03'];
+		this._elByName('pose-save-button').setAttribute('values', poseNames.join(','));
+		this._elByName('pose-save-button').addEventListener('change', (ev) => {
 			if (!this.vrmEl) { return; }
-			let poseJson = JSON.stringify(vrmEl.components.vrm.avatar.getPose(true));
-			localStorage.setItem('vrm-pose0', poseJson);
+			let poseJson = JSON.stringify(this.vrmEl.components.vrm.avatar.getPose(true));
+			localStorage.setItem('vrm-' + ev.detail.value, poseJson);
 		});
-		this._elByName('pose-load-button').addEventListener('click', (ev) => {
+
+		this._elByName('pose-load-button').setAttribute('values', poseNames.join(','));
+		this._elByName('pose-load-button').addEventListener('change', (ev) => {
 			if (!this.vrmEl) { return; }
-			let poseJson = localStorage.getItem('vrm-pose0');
+			let poseJson = localStorage.getItem('vrm-' + ev.detail.value);
 			if (poseJson) {
 				this.vrmEl.removeAttribute('vrm-bvh');
 				if (this.vrmEl.hasAttribute('vrm-poser')) {
