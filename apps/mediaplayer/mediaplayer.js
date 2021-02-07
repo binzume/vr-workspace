@@ -4,7 +4,15 @@ if (typeof AFRAME === 'undefined') {
 	throw 'AFRAME is not loaded.';
 }
 
+/** 
+ * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
+ */
+
 class BaseFileList {
+	/**
+	 * @param {string} itemPath
+	 * @param {{[key:string]:string}?} options
+	 */
 	constructor(itemPath, options) {
 		this.itemPath = itemPath;
 		this.options = options || {};
@@ -13,9 +21,17 @@ class BaseFileList {
 		this.thumbnailUrl = null;
 		this.onupdate = null;
 	}
-	init() {
-		return this.get(0)
+
+	/**
+	 * @returns {Promise<void>}
+	 */
+	async init() {
+		await this.get(0)
 	}
+
+	/**
+	 * @returns {Promise<ContentInfo>}
+	 */
 	async get(position) {
 		throw 'not implemented';
 	}
@@ -26,7 +42,43 @@ class BaseFileList {
 	}
 }
 
+class FileListCursor {
+	/**
+	 * @param {BaseFileList} fileList
+	 * @param {number} position
+	 * @param {((ContentInfo) => boolean)} filter
+	 */
+	constructor(fileList, position, filter) {
+		this.fileList = fileList;
+		this.position = position | 0;
+		this.filter = filter;
+		this.onpositionchange = null;
+	}
+
+	/**
+	 * @param {number} ofs
+	 */
+	async moveOffset(ofs) {
+		this.position += ofs | 0;
+		while (this.position >= 0 && this.position < this.fileList.size) {
+			let item = await this.fileList.get(this.position);
+			if (item && this.filter == null || this.filter(item)) {
+				this.onpositionchange && this.onpositionchange(this.position);
+				return item;
+			}
+			this.position += ofs < 0 ? -1 : 1;
+		}
+		this.position = this.position < 0 ? this.fileList.size : -1;
+		return null;
+	}
+}
+
 class ItemList extends BaseFileList {
+	/**
+	 * @param {string} apiUrl
+	 * @param {string} itemPath
+	 * @param {{[key:string]:string}?} options
+	 */
 	constructor(apiUrl, itemPath, options) {
 		super(itemPath, options);
 		this.thumbnailUrl = null;
@@ -233,13 +285,12 @@ AFRAME.registerComponent('media-selector', {
 	schema: {
 		storage: { default: "" },
 		path: { default: "" },
+		sortField: { default: "" },
+		sortOrder: { default: "" },
 		openWindow: { default: false }
 	},
 	init() {
 		this.itemlist = storageList;
-		this.currentPos = -1;
-		this.sortOrder = null;
-		this.sortBy = null;
 		this.item = {};
 		let videolist = this._byName('medialist').components.xylist;
 		let itemWidth = 4.0;
@@ -249,7 +300,6 @@ AFRAME.registerComponent('media-selector', {
 		let windowWidth = this.el.getAttribute('width');
 		let gridMode = false;
 		if (windowWidth >= 4) {
-			// experimental
 			gridMode = true;
 			cols = Math.floor(windowWidth / 1.5);
 			itemHeight = itemWidth = windowWidth / cols;
@@ -381,7 +431,6 @@ AFRAME.registerComponent('media-selector', {
 		});
 		videolist.el.addEventListener('clickitem', async (ev) => {
 			let pos = ev.detail.index;
-			this.currentPos = pos | 0;
 			let item = await this.itemlist.get(pos);
 			if (item.url == null && item.type.startsWith("application/")) {
 				// HACK: for Google drive.
@@ -403,7 +452,11 @@ AFRAME.registerComponent('media-selector', {
 			} else if (item.type == "folder" || item.type == "archive") {
 				this._openList(item.storage || this.data.storage, item.path, item.type == "archive");
 			} else {
-				this.el.sceneEl.systems["media-player"].playContent(item, this);
+				var cursor = new FileListCursor(this.itemlist, pos, (item) => {
+					let t = item.type.split("/")[0];
+					return t == "image" || t == "video" || t == "audio";
+				});
+				this.el.sceneEl.systems["media-player"].playContent(item, cursor);
 			}
 		});
 
@@ -432,9 +485,10 @@ AFRAME.registerComponent('media-selector', {
 		});
 
 		this._byName('sort-option').setAttribute('values', ["Name", "Update", "Size"].join(","));
-		this._byName('sort-option').addEventListener('change', (/** @type {CustomEvent} */ev) => {
+		this._byName('sort-option').addEventListener('change', (ev) => {
 			let field = ["name", "updated", "size"][ev.detail.index];
-			this.setSort(field, (this.sortBy == field && this.sortOrder == "a") ? "d" : "a");
+			let order = (this.data.sortField == field && this.data.sortOrder == "a") ? "d" : "a";
+			this.el.setAttribute("media-selector", { sortField: field, sortOrder: order });
 		});
 	},
 	update() {
@@ -458,17 +512,11 @@ AFRAME.registerComponent('media-selector', {
 			this.el.setAttribute("media-selector", "path:" + path + (storage ? ";storage:" + storage : ""));
 		}
 	},
-	setSort(sortBy, sortOrder) {
-		this.sortBy = sortBy;
-		this.sortOrder = sortOrder;
-		this._loadList(this.itemlist.itemPath);
-	},
 	_loadList(path) {
-		this.currentPos = 0;
 		this.itemlist.onupdate = null;
-		this.itemlist = storageList.getList(this.data.storage, path, { orderBy: this.sortBy, order: this.sortOrder });
+		this.itemlist = storageList.getList(this.data.storage, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
 		if (!this.itemlist) {
-			storageList._setSort(this.sortBy, this.sortOrder);
+			storageList._setSort(this.data.sortField, this.data.sortOrder);
 			this.itemlist = storageList;
 		}
 		this.el.setAttribute("title", "Loading...");
@@ -484,24 +532,8 @@ AFRAME.registerComponent('media-selector', {
 			this.el.setAttribute("title", this.item.name);
 		});
 	},
-	movePos(d) {
-		this.currentPos += d;
-		if (this.currentPos >= 0 && this.currentPos < this.itemlist.size) {
-			this.itemlist.get(this.currentPos).then(item => {
-				let t = item.type.split("/")[0];
-				if (t == "image" || t == "video" || t == "audio") {
-					this.el.sceneEl.systems["media-player"].playContent(item, this);
-				} else {
-					// skip
-					this.movePos(d);
-				}
-			});
-		} else {
-			this.currentPos = this.currentPos < 0 ? this.itemlist.size : -1;
-		}
-	},
 	_byName(name) {
-		return this.el.querySelector("[name=" + name + "]");
+		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
 	}
 });
 
@@ -512,9 +544,12 @@ AFRAME.registerComponent('media-player', {
 		playbackRate: { default: 1.0 },
 		loadingSrc: { default: "#mediaplayer-loading" },
 		mediaController: { default: "media-controller" },
+		maxWidth: { default: 25 },
+		maxHeight: { default: 25 },
 		screen: { default: ".screen" }
 	},
 	init() {
+		this.loadingTimer = null;
 		this.screen = this.el.querySelector(this.data.screen);
 		this.touchToPlay = false;
 		this.system.registerPlayer(this);
@@ -553,11 +588,10 @@ AFRAME.registerComponent('media-player', {
 	},
 	resize(width, height) {
 		console.log("media size: " + width + "x" + height);
-		let maxw = 25, maxh = 25;
-		let w = maxw;
+		let w = this.data.maxWidth;
 		let h = height / width * w;
-		if (h > maxh) {
-			h = maxh;
+		if (h > this.data.maxHeight) {
+			h = this.data.maxHeight;
 			w = width / height * h;
 		}
 		if (isNaN(h)) {
@@ -570,22 +604,24 @@ AFRAME.registerComponent('media-player', {
 		this.el.setAttribute("width", w);
 		this.el.setAttribute("height", h);
 	},
-	playContent(f, mediaSelector) {
-		this.el.dispatchEvent(new CustomEvent('media-player-play', { detail: { item: f, mediaSelector: mediaSelector } }));
+	playContent(f, listCursor) {
+		this.listCursor = listCursor;
+		this.el.dispatchEvent(new CustomEvent('media-player-play', { detail: { item: f, cursor: listCursor } }));
 		console.log("play: " + f.url + " " + f.type);
 		if (this.el.components.xywindow && f.name) {
 			this.el.setAttribute("xywindow", "title", f.name);
 		}
-		this.screen.removeAttribute("material"); // to avoid texture leaks.
-		this.screen.setAttribute('material', { shader: "flat", src: this.data.loadingSrc, transparent: false, npot: true });
+
+		clearTimeout(this.loadingTimer);
+		this.loadingTimer = setTimeout(() => this._setSrc(this.data.loadingSrc, false), 200);
 
 		/** @type {Element & {[x:string]:any}} TODO clean up type */
 		let dataElem;
 		if (f.type && f.type.split("/")[0] == "image") {
 			dataElem = Object.assign(document.createElement("img"), { crossOrigin: "" });
 			dataElem.addEventListener('load', ev => {
+				this._setSrc("#" + dataElem.id, (f.url || f.type).endsWith("png"));
 				this.resize(dataElem.naturalWidth, dataElem.naturalHeight);
-				this.screen.setAttribute('material', { shader: "flat", src: "#" + dataElem.id, transparent: (f.url || f.type).endsWith("png"), npot: true });
 				this.el.dispatchEvent(new CustomEvent('media-player-loaded', { detail: { item: f, event: ev } }));
 			});
 		} else {
@@ -593,10 +629,9 @@ AFRAME.registerComponent('media-player', {
 				autoplay: true, controls: false, loop: this.data.loop, id: "dummyid", crossOrigin: ""
 			});
 			dataElem.addEventListener('loadeddata', ev => {
+				this._setSrc("#" + dataElem.id, false);
 				dataElem.playbackRate = this.data.playbackRate;
 				this.resize(dataElem.videoWidth, dataElem.videoHeight);
-				this.screen.setAttribute("src", "#" + dataElem.id);
-				this.screen.setAttribute('material', { shader: "flat", src: "#" + dataElem.id, transparent: false });
 				this.el.dispatchEvent(new CustomEvent('media-player-loaded', { detail: { item: f, event: ev } }));
 			});
 			dataElem.addEventListener('ended', ev => {
@@ -641,6 +676,21 @@ AFRAME.registerComponent('media-player', {
 			}
 		}
 		this.setStereoMode(this.stereoMode);
+	},
+	async movePos(d) {
+		if (!this.listCursor) {
+			return;
+		}
+		let item = await this.listCursor.moveOffset(d);
+		if (item) {
+			this.playContent(item, this.listCursor);
+		}
+	},
+	_setSrc(src, transparent) {
+		this.screen.removeAttribute("material"); // to avoid texture leaks.
+		clearTimeout(this.loadingTimer);
+		this.loadingTimer = null;
+		this.screen.setAttribute('material', { shader: "flat", src: src, transparent: transparent });
 	},
 	tick() {
 		// workaround for https://bugs.chromium.org/p/chromium/issues/detail?id=1107578
@@ -710,6 +760,7 @@ AFRAME.registerComponent('media-player', {
 		}
 	},
 	remove: function () {
+		clearTimeout(this.loadingTimer);
 		this.system.unregisterPlayer(this);
 		this.screen.removeAttribute("material"); // to avoid texture leaks.
 		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
@@ -726,10 +777,10 @@ AFRAME.registerSystem('media-player', {
 			if (this.shortcutKeys && !this.currentPlayer) return;
 			switch (ev.code) {
 				case "ArrowRight":
-					this.currentPlayer.mediaSelector.movePos(1);
+					this.currentPlayer.movePos(1);
 					break;
 				case "ArrowLeft":
-					this.currentPlayer.mediaSelector.movePos(-1);
+					this.currentPlayer.movePos(-1);
 					break;
 				case "Space":
 					this.currentPlayer.togglePause();
@@ -738,22 +789,20 @@ AFRAME.registerSystem('media-player', {
 		});
 		setTimeout(() => {
 			document.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('bbuttondown', ev => {
-				if (this.currentPlayer) this.currentPlayer.mediaSelector.movePos(-1);
+				if (this.currentPlayer) this.currentPlayer.movePos(-1);
 			}));
 			document.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('abuttondown', ev => {
-				if (this.currentPlayer) this.currentPlayer.mediaSelector.movePos(1);
+				if (this.currentPlayer) this.currentPlayer.movePos(1);
 			}));
 		}, 0);
 	},
-	async playContent(item, mediaSelector) {
+	async playContent(item, listCursor) {
 		if (this.currentPlayer === null) {
 			(await window.appManager.launch('app-media-player')).addEventListener('loaded', e => {
-				this.currentPlayer.mediaSelector = mediaSelector;
-				this.currentPlayer.playContent(item, mediaSelector);
+				this.currentPlayer.playContent(item, listCursor);
 			}, { once: true });
 		} else {
-			this.currentPlayer.mediaSelector = mediaSelector;
-			this.currentPlayer.playContent(item, mediaSelector);
+			this.currentPlayer.playContent(item, listCursor);
 		}
 	},
 	registerPlayer(player) {
@@ -774,7 +823,6 @@ AFRAME.registerComponent('media-controller', {
 	schema: {},
 	init() {
 		this.player = null;
-		this.mediaSelector = null;
 		this.continuous = false;
 		this.intervalId = null;
 		this.continuousTimerId = null;
@@ -794,8 +842,8 @@ AFRAME.registerComponent('media-controller', {
 		this._updatePlaybackRate(isNaN(rate) ? 1.0 : rate);
 
 		this._byName("playpause").addEventListener('click', ev => this.player.togglePause());
-		this._byName("next").addEventListener('click', ev => this.mediaSelector.movePos(1));
-		this._byName("prev").addEventListener('click', ev => this.mediaSelector.movePos(-1));
+		this._byName("next").addEventListener('click', ev => this.player.movePos(1));
+		this._byName("prev").addEventListener('click', ev => this.player.movePos(-1));
 		this._byName("bak10s").addEventListener('click', ev => this.player.mediaEl.currentTime -= 10);
 		this._byName("fwd10s").addEventListener('click', ev => this.player.mediaEl.currentTime += 10);
 		this._byName("seek").addEventListener('change', ev => this.player.mediaEl.currentTime = ev.detail.value);
@@ -809,9 +857,8 @@ AFRAME.registerComponent('media-controller', {
 		this.player.el.addEventListener('media-player-ended', ev => this._continuousPlayNext(this.videoInterval));
 		this.player.el.addEventListener('media-player-play', ev => {
 			clearTimeout(this.continuousTimerId);
-			this.mediaSelector = ev.detail.mediaSelector;
-			this._byName("next").setAttribute('visible', this.mediaSelector != null);
-			this._byName("prev").setAttribute('visible', this.mediaSelector != null);
+			this._byName("next").setAttribute('visible', this.player.listCursor != null);
+			this._byName("prev").setAttribute('visible', this.player.listCursor != null);
 		});
 		this.player.el.addEventListener('media-player-loaded', ev => {
 			let isVideo = this.player.mediaEl.duration != null;
@@ -824,8 +871,8 @@ AFRAME.registerComponent('media-controller', {
 	},
 	_continuousPlayNext(delay) {
 		clearTimeout(this.continuousTimerId);
-		if (this.mediaSelector) {
-			this.continuousTimerId = setTimeout(() => this.continuous && this.mediaSelector.movePos(1), delay);
+		if (this.player.listCursor) {
+			this.continuousTimerId = setTimeout(() => this.continuous && this.player.movePos(1), delay);
 		}
 	},
 	_setLoopMode(modeIndex) {
