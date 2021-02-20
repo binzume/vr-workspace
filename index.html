@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Workspace</title>
-  <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
+  <script id='script-aframe' src="https://aframe.io/releases/1.1.0/aframe.min.js"></script>
   <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
   <script src="libs/mp4player/mp4player.js"></script>
   <script src="libs/utils/gesture.js"></script>
@@ -26,6 +26,7 @@
     <a id="app-vnc" href="apps/vnc/template.html#app-vnc">VNC Client</a>
     <a id="app-vrm" href="apps/vrmviewer/template.html" class='hidden'>VRM Viewer</a>
     <a id="app-vrm-control-panel" href="apps/vrmviewer/template.html#app-vrm-control-panel" data-wid='vrm-control-panel'>VRM ControlPanel</a>
+    <a id="app-game001" href="apps/game001/template.html">Game001</a>
     <a id="env-rosso" href="apps/rosso/index.html" data-apptype='env'>env:ROSSO</a>
     <a id="env-starrysky" href="apps/starrysky/template.html" data-apptype='env'>env:StarrySky</a>
     <a id="env-physics" href="apps/physics/index.html" data-apptype='env'>env:Physics</a>
@@ -87,8 +88,8 @@
 
     <a-entity id="camera-rig" position-controls="axismove:x" camera-control>
       <a-camera position="0 1.5 0" look-controls="enabled:false" wasd-controls="enabled:false"></a-camera>
-      <a-entity laser-controls="hand: right" id="rightHand" raycaster="far:Infinity;objects:.collidable" gesture="button:grip"></a-entity>
-      <a-entity laser-controls="hand: left" id="leftHand" raycaster="far:Infinity;objects:.collidable"></a-entity>
+      <a-entity laser-controls="hand: right" id="rightHand" raycaster="objects:.collidable" gesture="button:grip"></a-entity>
+      <a-entity laser-controls="hand: left" id="leftHand" raycaster="objects:.collidable"></a-entity>
 
       <!-- kbd -->
       <a-xykeyboard ime="true" distance="0.7" scale='0.22 0.22 0.22' position="0 0.9 -1" rotation='-30 0 0'></a-xykeyboard>
