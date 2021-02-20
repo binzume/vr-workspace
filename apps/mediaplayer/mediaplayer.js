@@ -695,12 +695,6 @@ AFRAME.registerComponent('media-player', {
 		this.loadingTimer = null;
 		this.screen.setAttribute('material', { shader: "flat", src: src, transparent: transparent });
 	},
-	tick() {
-		// workaround for https://bugs.chromium.org/p/chromium/issues/detail?id=1107578
-		if (this.mediaEl && this.mediaEl.tagName == "VIDEO" && this.mediaEl.readyState >= this.mediaEl.HAVE_CURRENT_DATA) {
-			this.screen.components.material.material.map.needsUpdate = true;
-		}
-	},
 	setStereoMode(idx) {
 		this.stereoMode = idx;
 		if (idx == 3 || idx == 4) {
