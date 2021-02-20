@@ -546,6 +546,7 @@ class Bullet {
     }
 
     dispose() {
+        if (!this.live) return;
         this.obj.parent.remove(this.obj);
         this.obj.material.dispose();
         this.obj.geometry.dispose();
@@ -636,6 +637,7 @@ class Target {
     }
 
     dispose() {
+        if (!this.live) return;
         // TODO: dispose cache
         this.mat.dispose();
         this.obj.parent.remove(this.obj);
@@ -669,9 +671,6 @@ class Game {
                 if (t.hitTest(b.obj.position)) {
                     console.log("Hit!");
                     b.dispose();
-                    if (t.hp <= 0) {
-                        this.stageClear(t, b.obj.position);
-                    }
                     break;
                 }
             }
@@ -679,10 +678,6 @@ class Game {
         this.targets.forEach(o => o.update(timeDelta));
         this.bullets = this.bullets.filter(b => b.live);
         this.targets = this.targets.filter(b => b.live);
-    }
-
-    async stageClear(t, p) {
-        console.log("Clear!");
     }
 
     dispose() {
