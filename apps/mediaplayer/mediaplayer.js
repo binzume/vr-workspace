@@ -620,6 +620,7 @@ AFRAME.registerComponent('media-player', {
 		if (f.type && f.type.split("/")[0] == "image") {
 			dataElem = Object.assign(document.createElement("img"), { crossOrigin: "" });
 			dataElem.addEventListener('load', ev => {
+				if (dataElem != this.mediaEl) { return; }
 				this._setSrc("#" + dataElem.id, (f.url || f.type).endsWith("png"));
 				this.resize(dataElem.naturalWidth, dataElem.naturalHeight);
 				this.el.dispatchEvent(new CustomEvent('media-player-loaded', { detail: { item: f, event: ev } }));
@@ -629,6 +630,7 @@ AFRAME.registerComponent('media-player', {
 				autoplay: true, controls: false, loop: this.data.loop, id: "dummyid", crossOrigin: ""
 			});
 			dataElem.addEventListener('loadeddata', ev => {
+				if (dataElem != this.mediaEl) { return; }
 				this._setSrc("#" + dataElem.id, false);
 				dataElem.playbackRate = this.data.playbackRate;
 				this.resize(dataElem.videoWidth, dataElem.videoHeight);
@@ -638,7 +640,14 @@ AFRAME.registerComponent('media-player', {
 				this.el.dispatchEvent(new CustomEvent('media-player-ended', { detail: { item: f, event: ev } }));
 			});
 		}
-		dataElem.id = "imageData" + new Date().getTime().toString(16) + Math.floor(Math.random() * 65536).toString(16);
+		dataElem.id = "media-player-" + new Date().getTime().toString(16) + Math.floor(Math.random() * 65536).toString(16);
+
+		// replace
+		var parent = (this.mediaEl || document.querySelector(this.data.loadingSrc)).parentNode;
+		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
+		parent.appendChild(dataElem);
+		this.mediaEl = dataElem;
+
 		if (!f.url && f.type.startsWith("video/mp4") && typeof MP4Player !== 'undefined') {
 			let options = {
 				opener: {
@@ -659,12 +668,6 @@ AFRAME.registerComponent('media-player', {
 		} else {
 			dataElem.src = f.url;
 		}
-
-		// replace
-		var parent = (this.mediaEl || document.querySelector(this.data.loadingSrc)).parentNode;
-		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
-		parent.appendChild(dataElem);
-		this.mediaEl = dataElem;
 
 		this.touchToPlay = false;
 		if (dataElem.play !== undefined) {

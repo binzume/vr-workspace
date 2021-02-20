@@ -615,9 +615,11 @@ AFRAME.registerComponent('window-locator', {
 		}
 	},
 	updateRotation() {
-		let cameraPosition = this.el.sceneEl.camera.getWorldPosition(new THREE.Vector3());
+		let camPos = new THREE.Vector3();
+		let camRot = new THREE.Quaternion();
+		this.el.sceneEl.camera.matrixWorld.decompose(camPos, camRot, new THREE.Vector3());
 		let targetPosition = this.el.object3D.getWorldPosition(new THREE.Vector3());
-		let tr = new THREE.Matrix4().lookAt(cameraPosition, targetPosition, new THREE.Vector3(0, 1, 0));
+		let tr = new THREE.Matrix4().lookAt(camPos, targetPosition, new THREE.Vector3(0, 1, 0));
 		this.el.object3D.setRotationFromMatrix(tr);
 	}
 });
@@ -689,7 +691,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		let m = fragment.match(/list:(.+)/);
 		if (m) {
 			let mediaList = await window.appManager.launch('app-media-selector');
-			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA' });
+			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA', sortField: 'updated', sortOrder: 'd' });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);
