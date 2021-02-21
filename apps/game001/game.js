@@ -528,7 +528,7 @@ class Bullet {
         this.v = v;
         this.ttl = 3000;
         this.live = true;
-        let geometry = new THREE.SphereGeometry(0.04, 8, 8);
+        let geometry = new THREE.SphereGeometry(0.03, 8, 4);
         let material = new THREE.MeshStandardMaterial({ color: 0x6699FF, roughness: 0.5 });
         this.obj = new THREE.Mesh(geometry, material);
         this.obj.position.copy(p);
@@ -625,7 +625,7 @@ class Target {
         let p = this.voxelObj.worldToLocal(this.tmpV.copy(worldPos)).multiplyScalar(voxel.size());
         let v = voxel.get(p.x, p.y, p.z);
         if (v > 0) {
-            voxel.sphere(p.x, p.y, p.z, (0.02) * voxel.size() + 1, 0);
+            voxel.sphere(p.x, p.y, p.z, (0.01) * voxel.size() + 1, 0);
             this.voxelUpdated = true;
             if (v == 2) {
                 this.hp--;
@@ -661,6 +661,9 @@ class Game {
     fire(p, v) {
         // TODO: bullet pool
         this.bullets.push(new Bullet(this.world, p, v.multiplyScalar(-0.05)));
+        if (this.bullets.length > 16) {
+            this.bullets[0].dispose();
+        }
     }
 
     update(timeDelta) {
