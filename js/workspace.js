@@ -19,6 +19,7 @@ class AppManager {
 	 * @param {string} selector
 	 */
 	loadApps(selector) {
+		// TODO: support manifest file.
 		/** @type {AppInfo[]} */
 		let apps = [];
 		for (let el of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll(selector))) {
@@ -77,6 +78,13 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
+		if (el.hasLoaded) {
+			el.emit('app-launch', { appManager: this, args: options.appArgs }, false);
+		} else {
+			el.addEventListener('loaded', (ev) => {
+				el.emit('app-launch', { appManager: this, args: options.appArgs }, false);
+			}, { once: true });
+		}
 		return el;
 	}
 
@@ -109,6 +117,7 @@ class AppManager {
 	 * @param {ContentInfo} contentInfo
 	 */
 	openContent(contentInfo) {
+		// TODO: Add app-open-content event.
 		for (let handler of this.contentHandlers) {
 			if (handler(contentInfo)) {
 				return true;
@@ -688,7 +697,13 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 
 	if (location.hash) {
 		let fragment = location.hash.slice(1);
-		let m = fragment.match(/list:(.+)/);
+		let m = fragment.match(/app:([\w\-]+):?(.+)?/);
+		if (m) {
+			window.appManager.launch(m[1], null, { appArgs: decodeURI(m[2]) });
+		}
+
+		// Deprecated
+		m = fragment.match(/list:(.+)/);
 		if (m) {
 			let mediaList = await window.appManager.launch('app-media-selector');
 			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA', sortField: 'updated', sortOrder: 'd' });

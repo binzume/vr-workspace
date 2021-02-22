@@ -292,6 +292,7 @@ AFRAME.registerComponent('media-selector', {
 	init() {
 		this.itemlist = storageList;
 		this.item = {};
+		this.appManager = null;
 		let videolist = this._byName('medialist').components.xylist;
 		let itemWidth = 4.0;
 		let itemHeight = 1.0;
@@ -299,6 +300,16 @@ AFRAME.registerComponent('media-selector', {
 		let thumbW = 200, thumbH = 128;
 		let windowWidth = this.el.getAttribute('width');
 		let gridMode = false;
+		this.el.addEventListener('app-launch', (ev) => {
+			this.appManager = ev.detail.appManager;
+			if (ev.detail.args) {
+				// TODO: parse args
+				let p = ev.detail.args.split(/\/(.*)/);
+				if (p.length >= 2) {
+					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updated', sortOrder: 'd' });
+				}
+			}
+		}, { once: true });
 		if (windowWidth >= 4) {
 			gridMode = true;
 			cols = Math.floor(windowWidth / 1.5);
@@ -447,7 +458,7 @@ AFRAME.registerComponent('media-selector', {
 			console.log(item);
 			if (item.type === "list" || item.type === "tag") {
 				this._openList(item.storage, item.path);
-			} else if (window.appManager && appManager.openContent(item)) {
+			} else if (this.appManager && this.appManager.openContent(item)) {
 				// opened
 			} else if (item.type == "folder" || item.type == "archive") {
 				this._openList(item.storage || this.data.storage, item.path, item.type == "archive");
@@ -501,8 +512,8 @@ AFRAME.registerComponent('media-selector', {
 		this.itemlist.onupdate = null;
 	},
 	async _openList(storage, path, openWindow) {
-		if ((openWindow || this.data.openWindow) && window.appManager) {
-			let mediaList = await window.appManager.launch('app-media-selector');
+		if ((openWindow || this.data.openWindow) && this.appManager) {
+			let mediaList = await this.appManager.launch('app-media-selector');
 			let pos = new THREE.Vector3().set(this.el.getAttribute("width") * 1 + 0.3, 0, 0);
 			mediaList.setAttribute("rotation", this.el.getAttribute("rotation"));
 			mediaList.setAttribute("position", this.el.object3D.localToWorld(pos));
