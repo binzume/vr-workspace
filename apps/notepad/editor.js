@@ -12,6 +12,25 @@ class TextLine {
 	}
 }
 
+class TextRange {
+	constructor(start, end) {
+		this.start = start || [0, 0];
+		this.end = end || this.start.slice();
+	}
+	min() {
+		return this._startBeforeEnd() ? this.start : this.end;
+	}
+	max() {
+		return this._startBeforeEnd() ? this.end : this.start;
+	}
+	clone() {
+		return new TextRange(this.start.slice(), this.end.slice());
+	}
+	_startBeforeEnd() {
+		return this.start[0] < this.end[0] || (this.start[0] == this.end[0] && this.start[1] < this.end[1]);
+	}
+}
+
 class MultilineText {
 	constructor(width, height, lineHeight, options = {}) {
 		this.lines = [new TextLine('')];
@@ -31,6 +50,7 @@ class MultilineText {
 		this.fontResolution = options.fontResolution || 32;
 		this.font = "" + (this.fontResolution * 0.9) + "px sans-serif";
 		this.caret = null;
+		this.selection = null;
 
 		this.setSize(width, height, lineHeight);
 	}
@@ -52,7 +72,6 @@ class MultilineText {
 		let ctx = this.canvasCtx;
 		ctx.font = this.font;
 		ctx.textBaseline = 'top';
-		ctx.fillStyle = 'white';
 
 		console.log('canvas size', textureWidth, this.fontResolution * textureLines);
 		for (let i = 0; i < textureLines; i++) {
@@ -70,6 +89,7 @@ class MultilineText {
 
 	setText(text) {
 		this.lines = text.split("\n").map(text => new TextLine(text));
+		this.selection = null;
 		this.scrollY = 0;
 		this.scrollX = 0;
 		this.refresh();
@@ -79,11 +99,24 @@ class MultilineText {
 		return this.lines.map(l => l.text).join("\n");
 	}
 
+	getTextRange(range) {
+		let begin = this.validatePosition(range.min());
+		let end = this.validatePosition(range.max());
+		if (begin[0] == end[0]) {
+			return this.lines[begin[0]].text.substring(begin[1], end[1]);
+		}
+		let h = this.lines[begin[0]].text.substring(begin[1]);
+		let t = this.lines[end[0]].text.substring(0, end[1]);
+		let lines = this.lines.slice(begin[0], end[0]);
+		return h + lines.map(l => l.text).join("\n") + t;
+	}
+
 	insert(pos, str) {
-		let l = pos[0];
-		let line = this.lines[l];
-		let h = line.text.substring(0, pos[1]);
-		let t = line.text.substring(pos[1]);
+		this.validatePosition(pos);
+		this.setSelection(null);
+		let l = pos[0], lineText = this.lines[l].text;
+		let h = lineText.substring(0, pos[1]);
+		let t = lineText.substring(pos[1]);
 		let ll = (h + str).split("\n");
 		let lastStr = ll.pop();
 		this._setLine(l, lastStr + t);
@@ -95,17 +128,41 @@ class MultilineText {
 		return [l + ll.length, lastStr.length];
 	}
 
-	remove(begin, end) {
-		this.validatePosition(begin);
-		this.validatePosition(end);
-		let startLine = this.lines[begin[0]];
-		let endLine = this.lines[end[0]];
-		let h = startLine.text.substring(0, begin[1]);
-		let t = endLine.text.substring(end[1]);
+	remove(range) {
+		this.setSelection(null);
+		let begin = this.validatePosition(range.min());
+		let end = this.validatePosition(range.max());
+		let h = this.lines[begin[0]].text.substring(0, begin[1]);
+		let t = this.lines[end[0]].text.substring(end[1]);
 		this.lines.splice(begin[0], end[0] - begin[0]).forEach(l => this._hideLine(l));
 		this._setLine(begin[0], h + t);
 		if (end[0] - begin[0]) {
 			this.refresh();
+		}
+	}
+
+	setSelection(sel) {
+		let old = this.selection;
+		this.selection = sel;
+		if (sel) {
+			this.validatePosition(sel.min());
+			this.validatePosition(sel.max());
+			// TODO: mege if sel.overwrap(old)
+			this._redrawRange(sel);
+		}
+		if (old) {
+			this._redrawRange(old);
+		}
+	}
+
+	_redrawRange(range) {
+		let last = range.max()[0];
+		for (let l = range.min()[0]; l <= last; l++) {
+			console.log(l);
+			let line = this.lines[l];
+			if (line.visible) {
+				this._drawLine(line, l);
+			}
 		}
 	}
 
@@ -126,7 +183,7 @@ class MultilineText {
 		for (let n = 0; n < lines && start + n < this.lines.length; n++) {
 			let l = start + n;
 			let line = this.lines[l];
-			this._showLine(line);
+			this._showLine(line, l);
 			// console.log('show', l, line);
 			let mesh = this.lineMeshes[line.textureLine];
 			mesh.position.set(0, this.lineHeight * (- l - 0.5), 0);
@@ -165,13 +222,13 @@ class MultilineText {
 		}
 	}
 
-	_showLine(line) {
+	_showLine(line, l) {
 		if (line == null || line.visible) {
 			return;
 		}
 		if (line.textureLine === null) {
 			this._bindTextureLine(line);
-			this._drawLine(line)
+			this._drawLine(line, l);
 		} else {
 			this.textureFreeLines = this.textureFreeLines.filter(l => l != line.textureLine);
 		}
@@ -189,12 +246,41 @@ class MultilineText {
 		line.visible = false;
 	}
 
-	_drawLine(line) {
+	_drawLine(line, l) {
 		let ctx = this.canvasCtx;
 		let y = line.textureLine * this.fontResolution;
 		ctx.clearRect(0, y, this.canvas.width, this.fontResolution);
-		ctx.fillText(line.text, line.xOffset, y);
-		line.width = ctx.measureText(line.text).width;
+
+		let fragments = [];
+		let selection = this.selection;
+		if (selection && l >= selection.min()[0] && l <= selection.max()[0]) {
+			let min = selection.min(), max = selection.max();
+			let text = line.text;
+			let s = min[0] == l && min[1] > 0 ? min[1] : 0;
+			let e = max[0] == l ? max[1] : text.length;
+			if (s > 0) {
+				fragments.push([text.slice(0, s), 'white', null]);
+			}
+			fragments.push([text.slice(s, e), 'yellow', 'blue']);
+			if (e < text.length) {
+				fragments.push([text.slice(e), 'white', null]);
+			}
+		} else {
+			fragments.push([line.text, 'white', null]);
+		}
+
+		line.width = 0;
+		for (let f of fragments) {
+			let w = ctx.measureText(f[0]).width;
+			if (f[2]) {
+				ctx.fillStyle = f[2];
+				ctx.fillRect(line.width + line.xOffset, y, w, this.fontResolution);
+			}
+			ctx.fillStyle = f[1];
+			ctx.fillText(f[0], line.width + line.xOffset, y);
+			line.width += w;
+		}
+		this.maxWidth = Math.max(this.maxWidth, line.width)
 		this.texture.needsUpdate = true;
 	}
 
@@ -214,7 +300,7 @@ class MultilineText {
 		}
 		line.text = text;
 		if (line.visible) {
-			this._drawLine(line);
+			this._drawLine(line, l);
 		}
 	}
 
@@ -241,16 +327,8 @@ class MultilineText {
 		return min;
 	}
 
-	_updateMaxWidth() {
-		let max = 0;
-		for (let l of this.lines) {
-			max = Math.max(l.width);
-		}
-		this.maxWidth = max;
-	}
-
 	_clearMesh() {
-		// TODO: dispose
+		this.lineMeshes.forEach(m => m.geometry.dispose());
 		this.lineMeshes = [];
 	}
 
@@ -318,26 +396,18 @@ AFRAME.registerComponent('texteditor', {
 		caretColor: { default: "#0088ff" },
 		bgColor: { default: "#222" },
 		editable: { default: true },
+		lineHeight: { default: 0.2 },
 		virtualKeyboard: { default: "[xykeyboard]", type: 'selector' },
 	},
 	init() {
-        let data = this.data, el = this.el, xyrect = el.components.xyrect;
-
-		let lineHeight = 0.3;
+		let data = this.data, el = this.el, xyrect = el.components.xyrect;
+		let lineHeight = this.data.lineHeight;
 		this.textView = new MultilineText(xyrect.width, xyrect.height, lineHeight);
-		this.textView.setText(`# Example text
-Hello!
 
-emoji: 🍣🍣🍣🍣🍣
-kanji: 日本語
-
-TODO:
-- Selection
-- Keyword highlight
-- Undo/Redo
-- Scrollbar (xy-scroll)
-`);
-		this.textView.insert([1, 5], ", world");
+		Object.defineProperty(el, 'value', {
+			get: () => this.textView.getText(),
+			set: (v) => this.textView.setText(v)
+		});
 
 		if (data.editable) {
 			this.caret = this.textView.caret = new MultilineTextCaret(this.textView, lineHeight * 0.1, lineHeight * 0.9, this.data.caretColor);
@@ -363,6 +433,11 @@ TODO:
 				let lp = this.textView.object3D.worldToLocal(intersection.point);
 				let pos = this.textView.getPositionFromLocal(lp);
 				this.caret.setPosition(pos);
+				if (this.textView.selection) {
+					// TODO: drag and shift key
+					let range = new TextRange(this.textView.selection.start, pos);
+					this.textView.setSelection(range);
+				}
 			}
 			let kbd = this.data.virtualKeyboard;
 			if (kbd) {
@@ -370,8 +445,15 @@ TODO:
 			}
 		});
 		let oncopy = (ev) => {
-			ev.clipboardData.setData('text/plain', this.textView.getText());
+			ev.clipboardData.setData('text/plain', this.textView.selection ? this.textView.getTextRange(this.textView.selection) : this.textView.getText());
 			ev.preventDefault();
+		};
+		let oncut = (ev) => {
+			if (this.textView.selection) {
+				ev.clipboardData.setData('text/plain', this.textView.getTextRange(this.textView.selection));
+				this.textView.remove(this.textView.selection);
+				ev.preventDefault();
+			}
 		};
 		let onpaste = (ev) => {
 			this.caret.setPosition(this.textView.insert(this.caret.position, ev.clipboardData.getData('text/plain')));
@@ -379,11 +461,13 @@ TODO:
 		};
 		el.addEventListener('focus', (ev) => {
 			window.addEventListener('copy', oncopy);
+			window.addEventListener('cut', oncut);
 			window.addEventListener('paste', onpaste);
 			this.caret.show();
 		});
 		el.addEventListener('blur', (ev) => {
 			window.removeEventListener('copy', oncopy);
+			window.removeEventListener('cut', oncut);
 			window.removeEventListener('paste', onpaste);
 			this.caret.hide();
 		});
@@ -395,18 +479,38 @@ TODO:
 			}
 		});
 		el.addEventListener('keydown', (ev) => {
+			let range = null;
+			if (ev.shiftKey) {
+				range = this.textView.selection?.clone() ?? new TextRange(this.caret.position.slice());
+			}
 			if (ev.code == 'ArrowLeft') {
 				this.caret.move(0, -1);
+				if (range) {
+					range.end = this.caret.position.slice();
+				}
+				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowRight') {
 				this.caret.move(0, 1);
+				if (range) {
+					range.end = this.caret.position.slice();
+				}
+				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowDown') {
 				this.caret.move(1, 0);
+				if (range) {
+					range.end = this.caret.position.slice();
+				}
+				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowUp') {
 				this.caret.move(-1, 0);
+				if (range) {
+					range.end = this.caret.position.slice();
+				}
+				this.textView.setSelection(range);
 			} else if (ev.code == 'Backspace') {
-				let begin = [this.caret.position[0], this.caret.position[1] - 1];
-				this.textView.remove(begin, this.caret.position);
-				this.caret.setPosition(begin);
+				let range = this.textView.selection || new TextRange([this.caret.position[0], this.caret.position[1] - 1], this.caret.position);
+				this.textView.remove(range);
+				this.caret.setPosition(range.start);
 			} else if (ev.code == 'Enter') {
 				let pos = this.textView.insert(this.caret.position, "\n");
 				this.caret.setPosition(pos);
@@ -427,14 +531,14 @@ TODO:
 
 
 AFRAME.registerPrimitive('a-texteditor', {
-    defaultComponents: {
-        xyrect: { width: 6, height: 3 },
-        texteditor: {  },
-    },
-    mappings: {
-        width: 'xyrect.width',
-        height: 'xyrect.height',
-        'caret-color': 'texteditor.caretColor',
-        'background-color': 'texteditor.bgColor'
-    }
+	defaultComponents: {
+		xyrect: { width: 6, height: 3 },
+		texteditor: {},
+	},
+	mappings: {
+		width: 'xyrect.width',
+		height: 'xyrect.height',
+		'caret-color': 'texteditor.caretColor',
+		'background-color': 'texteditor.bgColor'
+	}
 });
