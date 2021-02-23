@@ -9,6 +9,16 @@ AFRAME.registerComponent('vrm-select', {
 		el.addEventListener('click', ev => el.focus());
 		el.focus();
 
+		el.addEventListener('app-launch', async (ev) => {
+			let content = ev.detail.content;
+			if (content) {
+				if (content.url == null && content.fetch) {
+					content.url = URL.createObjectURL(await (await content.fetch()).blob());
+				}
+				el.setAttribute('vrm', { src: content.url });
+			}
+		}, { once: true });
+
 		document.querySelectorAll('[laser-controls]').forEach(el => {
 			let g = el.getAttribute('generic-tracked-controller-controls');
 			if (!g || g.defaultModel) {
@@ -27,12 +37,12 @@ AFRAME.registerComponent('vrm-select', {
 				// saVe
 				if (el.hasAttribute('vrm-poser')) {
 					let poseJson = JSON.stringify(el.components.vrm.avatar.getPose(true));
-					localStorage.setItem('vrm-pose0', poseJson);
+					localStorage.setItem('vrm-pose01', poseJson);
 					console.log(poseJson);
 				}
 			} else if (ev.detail.name == 'A') {
 				// loAd
-				let poseJson = localStorage.getItem('vrm-pose0');
+				let poseJson = localStorage.getItem('vrm-pose01');
 				if (poseJson) {
 					el.removeAttribute('vrm-bvh');
 					el.components.vrm.avatar.setPose(JSON.parse(poseJson));

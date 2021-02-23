@@ -2,7 +2,7 @@
 
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /** 
- * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;}} AppInfo
+ * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;contentTypes:string[]}} AppInfo
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
  */
 class AppManager {
@@ -25,8 +25,9 @@ class AppManager {
 		for (let el of /** @type {NodeListOf<HTMLAnchorElement>} */ (document.querySelectorAll(selector))) {
 			if (el.id) {
 				let type = el.dataset.apptype || 'app';
+				let contentTypes = el.dataset.contentType?.split(',') ?? [];
 				let hidden = el.classList.contains('hidden');
-				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.href, hidden: hidden, wid: el.dataset.wid };
+				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.href, hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes };
 				apps.push(app);
 			}
 		}
@@ -79,10 +80,10 @@ class AppManager {
 			el.setAttribute('window-locator', '');
 		}
 		if (el.hasLoaded) {
-			el.emit('app-launch', { appManager: this, args: options.appArgs }, false);
+			el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content }, false);
 		} else {
 			el.addEventListener('loaded', (ev) => {
-				el.emit('app-launch', { appManager: this, args: options.appArgs }, false);
+				el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content }, false);
 			}, { once: true });
 		}
 		return el;
@@ -117,11 +118,23 @@ class AppManager {
 	 * @param {ContentInfo} contentInfo
 	 */
 	openContent(contentInfo) {
-		// TODO: Add app-open-content event.
 		for (let handler of this.contentHandlers) {
 			if (handler(contentInfo)) {
 				return true;
 			}
+		}
+		let mimeType = contentInfo.type.split(';')[0];
+		if (mimeType == '') {
+			// TODO: remove this
+			let m = contentInfo.name.match(/\.(\w+)$/);
+			if (m) {
+				mimeType = 'application/' + m[1].toLowerCase();
+			}
+		}
+		let app = this.apps.find(app => app.contentTypes && app.contentTypes.includes(mimeType));
+		if (app) {
+			this.launch(app.id, null, { content: contentInfo });
+			return true;
 		}
 		return false;
 	}
