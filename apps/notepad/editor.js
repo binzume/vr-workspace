@@ -49,11 +49,12 @@ class MultilineText {
 		this.textMaterial = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true });
 		this.lineMeshes = [];
 		this.fontResolution = options.fontResolution || 32;
-		this.font = "" + (this.fontResolution * 0.9) + "px sans-serif";
+		this.font = options.font || 'sans-serif';
 		this.caret = null;
 		this.selection = null;
 
 		this.undoBuffer = [];
+		this.redoBuffer = [];
 		this.undoLmit = 2000;
 
 		this.setSize(width, height, lineHeight);
@@ -63,21 +64,18 @@ class MultilineText {
 		this.width = width;
 		this.height = height;
 		this.lineHeight = lineHeight;
+		this.visibleLineCount = Math.ceil(height / lineHeight);
 
 		this._clearMesh();
-		let lines = Math.ceil(height / lineHeight);
-		let textureLines = lines + 4;
+		let textureLines = this.visibleLineCount + 4;
 		this.textureLines = new Array(textureLines);
 		this.textureFreeLines = new Array(textureLines);
-		let textureWidth = width * this.fontResolution / lineHeight;
-		this.canvas.width = textureWidth;
+		this.canvas.width = width * this.fontResolution / lineHeight;
 		this.canvas.height = this.fontResolution * textureLines;
 
-		let ctx = this.canvasCtx;
-		ctx.font = this.font;
-		ctx.textBaseline = 'top';
+		this.canvasCtx.font = `${this.fontResolution * 0.9}px ${this.font}`;
+		this.canvasCtx.textBaseline = 'top';
 
-		console.log('canvas size', this.canvas.width, this.canvas.height);
 		for (let i = 0; i < textureLines; i++) {
 			let geom = new THREE.PlaneBufferGeometry(width, lineHeight);
 			let uv = geom.attributes.uv;
@@ -197,27 +195,29 @@ class MultilineText {
 	}
 
 	getPositionFromLocal(localPos) {
-		if (localPos.y > 0) {
-			return [0, 0];
-		}
-		let y = Math.floor(-localPos.y / this.lineHeight);
-		let x = this._getCharPos(y, (localPos.x / this.width + 0.5) * this.canvas.width);
-		return new TextPoint(y, x);
+		let l = Math.max(Math.min(Math.floor(-localPos.y / this.lineHeight), this.lines.length - 1), 0);
+		let c = this._getCol(l, (localPos.x / this.width + 0.5) * this.canvas.width);
+		return new TextPoint(l, c);
+	}
+
+	getLocalPos(pos, destVec3) {
+		let s = this.lines[pos.line].text.slice(0, pos.column);
+		let x = (this.canvasCtx.measureText(s).width - this.scrollX)
+			* this.width / this.canvas.width - this.width / 2;
+		destVec3.set(x, this.lineHeight * (-pos.line - 0.5), 0);
 	}
 
 	refresh() {
 		this.textureLines.forEach(line => this._hideLine(line));
 
-		let lines = Math.ceil(this.height / this.lineHeight);
-		let start = this.scrollY;
-		for (let n = 0; n < lines && start + n < this.lines.length; n++) {
-			let l = start + n;
-			let line = this.lines[l];
-			this._showLine(line, l);
+		let end = Math.min(this.scrollY + this.visibleLineCount, this.lines.length);
+		for (let ln = this.scrollY; ln < end; ln++) {
+			let line = this.lines[ln];
+			this._showLine(line, ln);
 			let mesh = this.lineMeshes[line.textureLine];
-			mesh.position.set(0, this.lineHeight * (- l - 0.5), 0);
+			mesh.position.set(0, this.lineHeight * (-ln - 0.5), 0);
 		}
-		this.object3D.position.set(0, this.lineHeight * (start + lines / 2), 0.01);
+		this.object3D.position.set(0, this.lineHeight * this.scrollY + this.height / 2, 0.01);
 
 		// TODO callback
 		if (this.caret) {
@@ -240,14 +240,34 @@ class MultilineText {
 	}
 
 	scrollTo(pos) {
+		this.validatePosition(pos);
 		if (this.scrollY > pos.line) {
 			this.scrollY = pos.line;
 			this.refresh();
 		}
-		let lines = Math.ceil(this.height / this.lineHeight);
-		if (this.scrollY <= pos.line - lines) {
-			this.scrollY = pos.line - lines + 1;
+		if (this.scrollY <= pos.line - this.visibleLineCount) {
+			this.scrollY = pos.line - this.visibleLineCount + 1;
 			this.refresh();
+		}
+
+		let s = this.lines[pos.line].text.slice(0, pos.column);
+		let x = this.canvasCtx.measureText(s).width - this.scrollX;
+		if (x < 0) {
+			this.scrollX += x;
+			this._redraw();
+		} else if (x > this.canvas.width) {
+			this.scrollX += x - this.canvas.width;
+			this._redraw();
+		}
+	}
+
+	_redraw() {
+		let end = Math.min(this.scrollY + this.visibleLineCount, this.lines.length);
+		for (let ln = this.scrollY; ln < end; ln++) {
+			let line = this.lines[ln];
+			if (line.visible) {
+				this._drawLine(line, ln);
+			}
 		}
 	}
 
@@ -277,7 +297,7 @@ class MultilineText {
 
 	_drawLine(line, l) {
 		let ctx = this.canvasCtx;
-		let y = line.textureLine * this.fontResolution;
+		let y = line.textureLine * this.fontResolution + 1;
 		ctx.clearRect(0, y, this.canvas.width, this.fontResolution);
 
 		let fragments = [];
@@ -303,7 +323,7 @@ class MultilineText {
 			let w = ctx.measureText(f[0]).width;
 			if (f[2]) {
 				ctx.fillStyle = f[2];
-				ctx.fillRect(line.width - this.scrollX, y, w, this.fontResolution);
+				ctx.fillRect(line.width - this.scrollX, y, w, this.fontResolution - 1);
 			}
 			ctx.fillStyle = f[1];
 			ctx.fillText(f[0], line.width - this.scrollX, y);
@@ -333,17 +353,14 @@ class MultilineText {
 		}
 	}
 
-	_getCharPos(l, x) {
-		let line = this.lines[l];
-		if (line == null) {
-			return 0;
-		}
+	_getCol(l, x) {
+		let str = this.lines[l].text;
 		let _caretpos = (p) => {
-			let s = line.text.slice(0, p);
+			let s = str.slice(0, p);
 			return this.canvasCtx.measureText(s).width;
 		};
 		// binary search...
-		let min = 0, max = line.text.length, p = 0;
+		let min = 0, max = str.length, p = 0;
 		while (max > min) {
 			p = min + ((max - min + 1) / 2 | 0);
 			if (_caretpos(p) < x) {
@@ -368,14 +385,12 @@ class MultilineText {
 	}
 }
 
-
 class MultilineTextCaret {
 	constructor(textView, width, height, color) {
 		this.textView = textView;
 		this.position = new TextPoint(0, 0);
 		this.obj = new THREE.Mesh(new THREE.PlaneBufferGeometry(width, height));
 		this.obj.material.color = new THREE.Color(color);
-		this.show();
 	}
 	show() {
 		let caretObj = this.obj;
@@ -392,10 +407,7 @@ class MultilineTextCaret {
 			this.hide();
 			return;
 		}
-		let meshPos = textView.lineMeshes[line.textureLine].position;
-		let s = line.text.slice(0, this.position.column);
-		let xpos = textView.canvasCtx.measureText(s).width * textView.width / textView.canvas.width - textView.width / 2;
-		this.obj.position.set(meshPos.x + xpos, meshPos.y, meshPos.z);
+		textView.getLocalPos(this.position, this.obj.position);
 	}
 	hide() {
 		let caretObj = this.obj;
@@ -419,16 +431,17 @@ class MultilineTextCaret {
 
 AFRAME.registerComponent('texteditor', {
 	schema: {
-		caretColor: { default: "#0088ff" },
-		bgColor: { default: "#222" },
+		caretColor: { default: '#0088ff' },
+		bgColor: { default: '#222' },
+		font: { default: '' },
 		editable: { default: true },
 		lineHeight: { default: 0.2 },
-		virtualKeyboard: { default: "[xykeyboard]", type: 'selector' },
+		virtualKeyboard: { default: '[xykeyboard]', type: 'selector' },
 	},
 	init() {
 		let data = this.data, el = this.el, xyrect = el.components.xyrect;
 		let lineHeight = this.data.lineHeight;
-		this.textView = new MultilineText(xyrect.width, xyrect.height, lineHeight);
+		this.textView = new MultilineText(xyrect.width, xyrect.height, lineHeight, { font: data.font });
 
 		Object.defineProperty(el, 'value', {
 			get: () => this.textView.getText(),
