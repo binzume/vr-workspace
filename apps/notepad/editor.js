@@ -73,7 +73,7 @@ class MultilineText {
 		ctx.font = this.font;
 		ctx.textBaseline = 'top';
 
-		console.log('canvas size', textureWidth, this.fontResolution * textureLines);
+		console.log('canvas size', this.canvas.width, this.canvas.height);
 		for (let i = 0; i < textureLines; i++) {
 			let geom = new THREE.PlaneBufferGeometry(width, lineHeight);
 			let uv = geom.attributes.uv;
@@ -105,10 +105,10 @@ class MultilineText {
 		if (begin[0] == end[0]) {
 			return this.lines[begin[0]].text.substring(begin[1], end[1]);
 		}
-		let h = this.lines[begin[0]].text.substring(begin[1]);
-		let t = this.lines[end[0]].text.substring(0, end[1]);
-		let lines = this.lines.slice(begin[0], end[0]);
-		return h + lines.map(l => l.text).join("\n") + t;
+		let lines = this.lines.slice(begin[0], end[0] + 1).map(l => l.text);
+		lines[0] = lines[0].substring(begin[1]);
+		lines[lines.length - 1] = lines[lines.length - 1].substring(0, end[1]);
+		return lines.join("\n");
 	}
 
 	insert(pos, str) {
@@ -158,7 +158,6 @@ class MultilineText {
 	_redrawRange(range) {
 		let last = range.max()[0];
 		for (let l = range.min()[0]; l <= last; l++) {
-			console.log(l);
 			let line = this.lines[l];
 			if (line.visible) {
 				this._drawLine(line, l);
@@ -184,7 +183,6 @@ class MultilineText {
 			let l = start + n;
 			let line = this.lines[l];
 			this._showLine(line, l);
-			// console.log('show', l, line);
 			let mesh = this.lineMeshes[line.textureLine];
 			mesh.position.set(0, this.lineHeight * (- l - 0.5), 0);
 		}
@@ -323,7 +321,6 @@ class MultilineText {
 				max = p - 1;
 			}
 		}
-		console.log(x, min);
 		return min;
 	}
 
