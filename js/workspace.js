@@ -655,16 +655,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		if (m) {
 			ext = m[1].toLowerCase();
 		}
-		if (['vrm', 'glb'].includes(ext)) {
-			(async () => {
-				let el = await appManager.launch('app-vrm');
-				if (item.url == null && item.fetch) {
-					item.url = URL.createObjectURL(await (await item.fetch()).blob());
-				}
-				el.setAttribute('vrm', { src: item.url });
-			})();
-			return true;
-		}
+		// TODO: remove this.
 		if (['bvh'].includes(ext)) {
 			let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
 			if (activeModel) {
