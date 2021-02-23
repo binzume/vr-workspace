@@ -1,33 +1,34 @@
 "use strict";
 
-
-class TextLine {
-	constructor(text) {
-		this.text = text;
-		this.visible = false;
-		this.virtual = false; // wrapped lines
-		this.textureLine = null;
-		this.width = 0;
-		this.xOffset = 0;
+class TextPoint {
+	constructor(line, column) {
+		this.line = line;
+		this.column = column;
+	}
+	clone() { return new TextPoint(this.line, this.column); }
+	copy(p) { this.line = p.line; this.column = p.column; }
+	withOffset(l, c) { return new TextPoint(this.line + l, this.column + c); }
+	before(other) {
+		return this.line < other.line || (this.line == other.line && this.column < other.column);
 	}
 }
 
 class TextRange {
 	constructor(start, end) {
-		this.start = start || [0, 0];
-		this.end = end || this.start.slice();
+		this.start = start;
+		this.end = end || start.clone();
 	}
-	min() {
-		return this._startBeforeEnd() ? this.start : this.end;
-	}
-	max() {
-		return this._startBeforeEnd() ? this.end : this.start;
-	}
-	clone() {
-		return new TextRange(this.start.slice(), this.end.slice());
-	}
-	_startBeforeEnd() {
-		return this.start[0] < this.end[0] || (this.start[0] == this.end[0] && this.start[1] < this.end[1]);
+	min() { return this.start.before(this.end) ? this.start : this.end; }
+	max() { return this.start.before(this.end) ? this.end : this.start; }
+	clone() { return new TextRange(this.start.clone(), this.end.clone()); }
+}
+
+class TextLine {
+	constructor(text) {
+		this.text = text;
+		this.visible = false;
+		this.textureLine = null;
+		this.width = 0;
 	}
 }
 
@@ -102,21 +103,21 @@ class MultilineText {
 	getTextRange(range) {
 		let begin = this.validatePosition(range.min());
 		let end = this.validatePosition(range.max());
-		if (begin[0] == end[0]) {
-			return this.lines[begin[0]].text.substring(begin[1], end[1]);
+		if (begin.line == end.line) {
+			return this.lines[begin.line].text.substring(begin.column, end.column);
 		}
-		let lines = this.lines.slice(begin[0], end[0] + 1).map(l => l.text);
-		lines[0] = lines[0].substring(begin[1]);
-		lines[lines.length - 1] = lines[lines.length - 1].substring(0, end[1]);
+		let lines = this.lines.slice(begin.line, end.line + 1).map(l => l.text);
+		lines[0] = lines[0].substring(begin.column);
+		lines[lines.length - 1] = lines[lines.length - 1].substring(0, end.column);
 		return lines.join("\n");
 	}
 
 	insert(pos, str) {
 		this.validatePosition(pos);
 		this.setSelection(null);
-		let l = pos[0], lineText = this.lines[l].text;
-		let h = lineText.substring(0, pos[1]);
-		let t = lineText.substring(pos[1]);
+		let l = pos.line, lineText = this.lines[l].text;
+		let h = lineText.substring(0, pos.column);
+		let t = lineText.substring(pos.column);
 		let ll = (h + str).split("\n");
 		let lastStr = ll.pop();
 		this._setLine(l, lastStr + t);
@@ -125,18 +126,18 @@ class MultilineText {
 			this.lines.splice(l, 0, ...ll.map(text => new TextLine(text)));
 			this.refresh();
 		}
-		return [l + ll.length, lastStr.length];
+		return new TextPoint(l + ll.length, lastStr.length);
 	}
 
 	remove(range) {
 		this.setSelection(null);
 		let begin = this.validatePosition(range.min());
 		let end = this.validatePosition(range.max());
-		let h = this.lines[begin[0]].text.substring(0, begin[1]);
-		let t = this.lines[end[0]].text.substring(end[1]);
-		this.lines.splice(begin[0], end[0] - begin[0]).forEach(l => this._hideLine(l));
-		this._setLine(begin[0], h + t);
-		if (end[0] - begin[0]) {
+		let h = this.lines[begin.line].text.substring(0, begin.column);
+		let t = this.lines[end.line].text.substring(end.column);
+		this.lines.splice(begin.line, end.line - begin.line).forEach(l => this._hideLine(l));
+		this._setLine(begin.line, h + t);
+		if (end.line - begin.line) {
 			this.refresh();
 		}
 	}
@@ -156,8 +157,8 @@ class MultilineText {
 	}
 
 	_redrawRange(range) {
-		let last = range.max()[0];
-		for (let l = range.min()[0]; l <= last; l++) {
+		let last = range.max().line;
+		for (let l = range.min().line; l <= last; l++) {
 			let line = this.lines[l];
 			if (line.visible) {
 				this._drawLine(line, l);
@@ -171,7 +172,7 @@ class MultilineText {
 		}
 		let y = Math.floor(-localPos.y / this.lineHeight);
 		let x = this._getCharPos(y, (localPos.x / this.width + 0.5) * this.canvas.width);
-		return [y, x];
+		return new TextPoint(y, x);
 	}
 
 	refresh() {
@@ -195,27 +196,27 @@ class MultilineText {
 	}
 
 	validatePosition(p, moveLine = true) {
-		if (moveLine && p[0] > 0 && p[1] < 0) {
-			p[0]--;
-			p[1] += this.lines[p[0]].text.length + 1;
+		if (moveLine && p.line > 0 && p.column < 0) {
+			p.line--;
+			p.column += this.lines[p.line].text.length + 1;
 		}
-		if (moveLine && p[0] < this.lines.length - 1 && p[1] > this.lines[p[0]]?.text.length) {
-			p[1] -= this.lines[p[0]].text.length + 1;
-			p[0]++;
+		if (moveLine && p.line < this.lines.length - 1 && p.column > this.lines[p.line]?.text.length) {
+			p.column -= this.lines[p.line].text.length + 1;
+			p.line++;
 		}
-		p[0] = Math.max(Math.min(p[0], this.lines.length - 1), 0);
-		p[1] = Math.max(Math.min(p[1], this.lines[p[0]].text.length), 0);
+		p.line = Math.max(Math.min(p.line, this.lines.length - 1), 0);
+		p.column = Math.max(Math.min(p.column, this.lines[p.line].text.length), 0);
 		return p;
 	}
 
 	scrollTo(pos) {
-		if (this.scrollY > pos[0]) {
-			this.scrollY = pos[0];
+		if (this.scrollY > pos.line) {
+			this.scrollY = pos.line;
 			this.refresh();
 		}
 		let lines = Math.ceil(this.height / this.lineHeight);
-		if (this.scrollY <= pos[0] - lines) {
-			this.scrollY = pos[0] - lines + 1;
+		if (this.scrollY <= pos.line - lines) {
+			this.scrollY = pos.line - lines + 1;
 			this.refresh();
 		}
 	}
@@ -251,11 +252,11 @@ class MultilineText {
 
 		let fragments = [];
 		let selection = this.selection;
-		if (selection && l >= selection.min()[0] && l <= selection.max()[0]) {
+		if (selection && l >= selection.min().line && l <= selection.max().line) {
 			let min = selection.min(), max = selection.max();
 			let text = line.text;
-			let s = min[0] == l && min[1] > 0 ? min[1] : 0;
-			let e = max[0] == l ? max[1] : text.length;
+			let s = min.line == l && min.column > 0 ? min.column : 0;
+			let e = max.line == l ? max.column : text.length;
 			if (s > 0) {
 				fragments.push([text.slice(0, s), 'white', null]);
 			}
@@ -272,10 +273,10 @@ class MultilineText {
 			let w = ctx.measureText(f[0]).width;
 			if (f[2]) {
 				ctx.fillStyle = f[2];
-				ctx.fillRect(line.width + line.xOffset, y, w, this.fontResolution);
+				ctx.fillRect(line.width - this.scrollX, y, w, this.fontResolution);
 			}
 			ctx.fillStyle = f[1];
-			ctx.fillText(f[0], line.width + line.xOffset, y);
+			ctx.fillText(f[0], line.width - this.scrollX, y);
 			line.width += w;
 		}
 		this.maxWidth = Math.max(this.maxWidth, line.width)
@@ -341,7 +342,7 @@ class MultilineText {
 class MultilineTextCaret {
 	constructor(textView, width, height, color) {
 		this.textView = textView;
-		this.position = [0, 0]; // [line, col]
+		this.position = new TextPoint(0, 0);
 		this.obj = new THREE.Mesh(new THREE.PlaneBufferGeometry(width, height));
 		this.obj.material.color = new THREE.Color(color);
 		this.show();
@@ -354,6 +355,18 @@ class MultilineTextCaret {
 		this.textView.scrollTo(this.position);
 		this._refresh();
 	}
+	_refresh() {
+		let textView = this.textView;
+		let line = textView.lines[this.position.line];
+		if (line == null || !line.visible) {
+			this.hide();
+			return;
+		}
+		let meshPos = textView.lineMeshes[line.textureLine].position;
+		let s = line.text.slice(0, this.position.column);
+		let xpos = textView.canvasCtx.measureText(s).width * textView.width / textView.canvas.width - textView.width / 2;
+		this.obj.position.set(meshPos.x + xpos, meshPos.y, meshPos.z);
+	}
 	hide() {
 		let caretObj = this.obj;
 		if (caretObj.parent) {
@@ -361,26 +374,12 @@ class MultilineTextCaret {
 		}
 	}
 	move(lineOffset, colOffset) {
-		let p = [this.position[0] + lineOffset, this.position[1] + colOffset];
-		this.textView.validatePosition(p, lineOffset == 0);
-		this.setPosition(p);
+		let p = this.position.withOffset(lineOffset, colOffset);
+		this.setPosition(this.textView.validatePosition(p, lineOffset == 0));
 	}
 	setPosition(p) {
-		this.textView.validatePosition(p);
-		this.position = p.slice();
+		this.position.copy(this.textView.validatePosition(p));
 		this.show();
-	}
-	_refresh() {
-		let textView = this.textView;
-		let line = textView.lines[this.position[0]];
-		if (line == null || !line.visible) {
-			this.hide();
-			return;
-		}
-		let meshPos = textView.lineMeshes[line.textureLine].position;
-		let s = line.text.slice(0, this.position[1]);
-		let xpos = textView.canvasCtx.measureText(s).width * textView.width / textView.canvas.width - textView.width / 2;
-		this.obj.position.set(meshPos.x + xpos, meshPos.y, meshPos.z);
 	}
 	dispose() {
 		this.obj.geometry.dispose();
@@ -448,6 +447,7 @@ AFRAME.registerComponent('texteditor', {
 		let oncut = (ev) => {
 			if (this.textView.selection) {
 				ev.clipboardData.setData('text/plain', this.textView.getTextRange(this.textView.selection));
+				this.caret.setPosition(this.textView.selection.min());
 				this.textView.remove(this.textView.selection);
 				ev.preventDefault();
 			}
@@ -478,34 +478,34 @@ AFRAME.registerComponent('texteditor', {
 		el.addEventListener('keydown', (ev) => {
 			let range = null;
 			if (ev.shiftKey) {
-				range = this.textView.selection?.clone() ?? new TextRange(this.caret.position.slice());
+				range = this.textView.selection?.clone() ?? new TextRange(this.caret.position.clone());
 			}
 			if (ev.code == 'ArrowLeft') {
 				this.caret.move(0, -1);
 				if (range) {
-					range.end = this.caret.position.slice();
+					range.end = this.caret.position.clone();
 				}
 				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowRight') {
 				this.caret.move(0, 1);
 				if (range) {
-					range.end = this.caret.position.slice();
+					range.end = this.caret.position.clone();
 				}
 				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowDown') {
 				this.caret.move(1, 0);
 				if (range) {
-					range.end = this.caret.position.slice();
+					range.end = this.caret.position.clone();
 				}
 				this.textView.setSelection(range);
 			} else if (ev.code == 'ArrowUp') {
 				this.caret.move(-1, 0);
 				if (range) {
-					range.end = this.caret.position.slice();
+					range.end = this.caret.position.clone();
 				}
 				this.textView.setSelection(range);
 			} else if (ev.code == 'Backspace') {
-				let range = this.textView.selection || new TextRange([this.caret.position[0], this.caret.position[1] - 1], this.caret.position);
+				let range = this.textView.selection || new TextRange(this.caret.position.withOffset(0, -1), this.caret.position);
 				this.textView.remove(range);
 				this.caret.setPosition(range.start);
 			} else if (ev.code == 'Enter') {
@@ -525,7 +525,6 @@ AFRAME.registerComponent('texteditor', {
 		this.textView.dispose();
 	}
 });
-
 
 AFRAME.registerPrimitive('a-texteditor', {
 	defaultComponents: {
