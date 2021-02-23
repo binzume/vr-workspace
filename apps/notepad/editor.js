@@ -475,31 +475,15 @@ AFRAME.registerComponent('texteditor', {
 			} else {
 			}
 		});
+
+		let caretMoves = {
+			ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowDown: [1, 0], ArrowUp: [-1, 0],
+			PageDown: [8, 0], PageUp: [-8, 0],
+		};
 		el.addEventListener('keydown', (ev) => {
-			let range = null;
-			if (ev.shiftKey) {
-				range = this.textView.selection?.clone() ?? new TextRange(this.caret.position.clone());
-			}
-			if (ev.code == 'ArrowLeft') {
-				this.caret.move(0, -1);
-				if (range) {
-					range.end = this.caret.position.clone();
-				}
-				this.textView.setSelection(range);
-			} else if (ev.code == 'ArrowRight') {
-				this.caret.move(0, 1);
-				if (range) {
-					range.end = this.caret.position.clone();
-				}
-				this.textView.setSelection(range);
-			} else if (ev.code == 'ArrowDown') {
-				this.caret.move(1, 0);
-				if (range) {
-					range.end = this.caret.position.clone();
-				}
-				this.textView.setSelection(range);
-			} else if (ev.code == 'ArrowUp') {
-				this.caret.move(-1, 0);
+			if (caretMoves[ev.code]) {
+				let range = ev.shiftKey ? this.textView.selection?.clone() ?? new TextRange(this.caret.position.clone()) : null;
+				this.caret.move(caretMoves[ev.code][0], caretMoves[ev.code][1]);
 				if (range) {
 					range.end = this.caret.position.clone();
 				}
@@ -509,8 +493,7 @@ AFRAME.registerComponent('texteditor', {
 				this.textView.remove(range);
 				this.caret.setPosition(range.start);
 			} else if (ev.code == 'Enter') {
-				let pos = this.textView.insert(this.caret.position, "\n");
-				this.caret.setPosition(pos);
+				this.caret.setPosition(this.textView.insert(this.caret.position, "\n"));
 			}
 		});
 
