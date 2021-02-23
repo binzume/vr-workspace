@@ -53,7 +53,8 @@ class MultilineText {
 		this.caret = null;
 		this.selection = null;
 
-		this.undoBuffer = []; // TODO: add undoLmit
+		this.undoBuffer = [];
+		this.undoLmit = 2000;
 
 		this.setSize(width, height, lineHeight);
 	}
@@ -115,7 +116,7 @@ class MultilineText {
 		return lines.join("\n");
 	}
 
-	insert(pos, str, undo = false) {
+	insert(pos, str, undo = null) {
 		this.validatePosition(pos);
 		this.setSelection(null);
 		let l = pos.line, lineText = this.lines[l].text;
@@ -130,15 +131,15 @@ class MultilineText {
 			this.lines.splice(l, 0, ...ll.map(text => new TextLine(text)));
 			this.refresh();
 		}
-		!undo && this.undoBuffer.push(['remove', new TextRange(pos.clone(), end)]);
+		this._addHistory(['remove', new TextRange(pos.clone(), end)], undo);
 		return end;
 	}
 
-	remove(range, undo = false) {
+	remove(range, undo = null) {
 		this.setSelection(null);
 		let begin = this.validatePosition(range.min());
 		let end = this.validatePosition(range.max());
-		!undo && this.undoBuffer.push(['insert', range.min(), this.getTextRange(range)]);
+		this._addHistory(['insert', range.min(), this.getTextRange(range)], undo);
 		let h = this.lines[begin.line].text.substring(0, begin.column);
 		let t = this.lines[end.line].text.substring(end.column);
 		this.lines.splice(begin.line, end.line - begin.line).forEach(l => this._hideLine(l));
@@ -149,14 +150,26 @@ class MultilineText {
 		return begin;
 	}
 
-	undo() {
-		let op = this.undoBuffer.pop();
+	undo(redo = false) {
+		let op = (redo ? this.redoBuffer : this.undoBuffer).pop();
 		if (op && op[0] == 'remove') {
-			return this.remove(op[1], true);
+			return this.remove(op[1], !redo);
 		} else if (op && op[0] == 'insert') {
-			return this.insert(op[1], op[2], true);
+			return this.insert(op[1], op[2], !redo);
 		}
 		return null;
+	}
+
+	_addHistory(op, undo) {
+		// TODO: merge one character operations.
+		let buffer = undo ? this.redoBuffer : this.undoBuffer;
+		if (undo == null) {
+			this.redoBuffer = [];
+		}
+		buffer.push(op);
+		if (buffer.length > this.undoLmit * 1.5) {
+			buffer.splice(0, buffer.length - this.undoLmit);
+		}
 	}
 
 	setSelection(sel) {
@@ -487,7 +500,7 @@ AFRAME.registerComponent('texteditor', {
 		});
 		el.addEventListener('keypress', (ev) => {
 			if (ev.ctrlKey && ev.code == 'KeyZ') {
-				let r = this.textView.undo();
+				let r = this.textView.undo(ev.shiftKey);
 				if (r) {
 					this.caret.setPosition(r);
 				}

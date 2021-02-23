@@ -11,7 +11,6 @@ kanji: 日本語
 
 TODO:
 - Keyword highlight
-- Redo
 - Scrollbar (xy-scroll)
 - Wrap
 `;
