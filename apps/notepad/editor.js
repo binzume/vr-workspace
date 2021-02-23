@@ -53,6 +53,8 @@ class MultilineText {
 		this.caret = null;
 		this.selection = null;
 
+		this.undoBuffer = []; // TODO: add undoLmit
+
 		this.setSize(width, height, lineHeight);
 	}
 
@@ -91,6 +93,7 @@ class MultilineText {
 	setText(text) {
 		this.lines = text.split("\n").map(text => new TextLine(text));
 		this.selection = null;
+		this.undoBuffer = [];
 		this.scrollY = 0;
 		this.scrollX = 0;
 		this.refresh();
@@ -112,7 +115,7 @@ class MultilineText {
 		return lines.join("\n");
 	}
 
-	insert(pos, str) {
+	insert(pos, str, undo = false) {
 		this.validatePosition(pos);
 		this.setSelection(null);
 		let l = pos.line, lineText = this.lines[l].text;
@@ -120,19 +123,22 @@ class MultilineText {
 		let t = lineText.substring(pos.column);
 		let ll = (h + str).split("\n");
 		let lastStr = ll.pop();
+		let end = new TextPoint(l + ll.length, lastStr.length);
 		this._setLine(l, lastStr + t);
 
 		if (ll.length > 0) {
 			this.lines.splice(l, 0, ...ll.map(text => new TextLine(text)));
 			this.refresh();
 		}
-		return new TextPoint(l + ll.length, lastStr.length);
+		!undo && this.undoBuffer.push(['remove', new TextRange(pos.clone(), end)]);
+		return end;
 	}
 
-	remove(range) {
+	remove(range, undo = false) {
 		this.setSelection(null);
 		let begin = this.validatePosition(range.min());
 		let end = this.validatePosition(range.max());
+		!undo && this.undoBuffer.push(['insert', range.min(), this.getTextRange(range)]);
 		let h = this.lines[begin.line].text.substring(0, begin.column);
 		let t = this.lines[end.line].text.substring(end.column);
 		this.lines.splice(begin.line, end.line - begin.line).forEach(l => this._hideLine(l));
@@ -140,6 +146,17 @@ class MultilineText {
 		if (end.line - begin.line) {
 			this.refresh();
 		}
+		return begin;
+	}
+
+	undo() {
+		let op = this.undoBuffer.pop();
+		if (op && op[0] == 'remove') {
+			return this.remove(op[1], true);
+		} else if (op && op[0] == 'insert') {
+			return this.insert(op[1], op[2], true);
+		}
+		return null;
 	}
 
 	setSelection(sel) {
@@ -469,10 +486,14 @@ AFRAME.registerComponent('texteditor', {
 			this.caret.hide();
 		});
 		el.addEventListener('keypress', (ev) => {
-			if (ev.code != 'Enter') {
+			if (ev.ctrlKey && ev.code == 'KeyZ') {
+				let r = this.textView.undo();
+				if (r) {
+					this.caret.setPosition(r);
+				}
+			} else if (ev.code != 'Enter') {
 				let pos = this.textView.insert(this.caret.position, ev.key);
 				this.caret.setPosition(pos); // TODO: changed event
-			} else {
 			}
 		});
 
@@ -490,8 +511,7 @@ AFRAME.registerComponent('texteditor', {
 				this.textView.setSelection(range);
 			} else if (ev.code == 'Backspace') {
 				let range = this.textView.selection || new TextRange(this.caret.position.withOffset(0, -1), this.caret.position);
-				this.textView.remove(range);
-				this.caret.setPosition(range.start);
+				this.caret.setPosition(this.textView.remove(range));
 			} else if (ev.code == 'Enter') {
 				this.caret.setPosition(this.textView.insert(this.caret.position, "\n"));
 			}
