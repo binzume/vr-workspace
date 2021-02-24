@@ -1,6 +1,6 @@
 # WebVR Workspace
 
-WebVRで色々試すための環境です．
+WebVR/WebXRで色々試すための環境です．
 
 ## Usage
 
@@ -20,9 +20,13 @@ OculusQuest等で上記URLにアクセスしてください．
 ## Available apps
 
 - Calculator
-- VNC Client (needs websockify)
+- Notepad
+- Console
 - Media Player
-- Google Drive client
+- Storage
+  - Google Drive client
+  - Demo storage (Read Only)
+- VNC Client (needs websockify)
 - VRM model viewer
 
 ![screenshot](docs/screenshot.png)
