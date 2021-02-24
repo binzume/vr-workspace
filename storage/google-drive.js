@@ -1,7 +1,11 @@
 "use strict";
 
-// <script src="googledrive.js"></script>
+// <script src="google-drive.js" type="module"></script>
 // <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
+
+
+const gapiUrl = 'https://apis.google.com/js/api.js?onload=gapiLoaded';
+const callbackName = 'gapiLoaded';
 
 class GoogleDrive {
     constructor(clientId) {
@@ -171,27 +175,36 @@ class GoogleDriveFileList {
     }
 }
 
-async function gapiLoaded() {
-    window.storageAccessors = window.storageAccessors || {};
+export function install() {
     const clientIds = {
         "http://localhost:8080": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
         "https://binzume.github.io": "86954684848-okobt1r6kedh2cskabcgmbbqe0baphjb.apps.googleusercontent.com"
     };
     if (!clientIds[location.origin]) {
-        console.log("clientId not found : " + location.origin);
+        console.log("No clientId for Google Drive: " + location.origin);
         return;
     }
-    let drive = new GoogleDrive(clientIds[location.origin]);
-    if (!await drive.init(false)) {
-        console.log("drive unavailable");
-        return;
-    }
-    console.log('gapi init');
+    globalThis[callbackName] = async () => {
+        globalThis.storageAccessors = globalThis.storageAccessors || {};
+        let drive = new GoogleDrive(clientIds[location.origin]);
+        if (!await drive.init(false)) {
+            console.log("drive unavailable");
+            return;
+        }
+        console.log('gapi init');
 
-    storageAccessors["GoogleDrive"] = {
-        name: "Google Drive",
-        root: 'root',
-        shortcuts: {},
-        getList: (folder, options) => new GoogleDriveFileList(folder, options, drive)
+        storageAccessors["GoogleDrive"] = {
+            name: "Google Drive",
+            root: 'root',
+            shortcuts: {},
+            getList: (folder, options) => new GoogleDriveFileList(folder, options, drive)
+        };
     };
+
+    let gapiScript = document.createElement('script');
+    gapiScript.src = gapiUrl;
+    gapiScript.async = true;
+    document.body.append(gapiScript);
 }
+
+install();
