@@ -436,7 +436,6 @@ AFRAME.registerComponent('texteditor', {
 		font: { default: '' },
 		editable: { default: true },
 		lineHeight: { default: 0.2 },
-		virtualKeyboard: { default: '[xykeyboard]', type: 'selector' },
 	},
 	init() {
 		let data = this.data, el = this.el, xyrect = el.components.xyrect;
@@ -478,10 +477,7 @@ AFRAME.registerComponent('texteditor', {
 					this.textView.setSelection(range);
 				}
 			}
-			let kbd = this.data.virtualKeyboard;
-			if (kbd) {
-				kbd.components.xykeyboard.show(this.data.type);
-			}
+			el.emit('xykeyboard-request', data.type);
 		});
 		let oncopy = (ev) => {
 			ev.clipboardData.setData('text/plain', this.textView.selection ? this.textView.getTextRange(this.textView.selection) : this.textView.getText());
