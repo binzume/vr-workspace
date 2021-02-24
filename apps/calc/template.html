@@ -12,40 +12,38 @@
 <body style="background-color: black; color:white;">
   <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
-    <a-entity id="app">
-        <a-xywindow calc scale='0.2 0.2 0.2' title="Calculator" width="2" height="3" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
-          <a-xyinput name="result" width="2"></a-xyinput>
+    <a-xywindow id="app" calc scale='0.2 0.2 0.2' title="Calculator" width="2" height="3" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
+      <a-xyinput name="result" width="2"></a-xyinput>
 
-          <a-xycontainer direction="horizontal" width="2" height="2.5" wrap="wrap">
+      <a-xycontainer direction="horizontal" width="2" height="2.5" wrap="wrap">
 
-            <a-xybutton class='calc-button' label="(" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label=")" width="0.5"></a-xybutton>
-            <a-xybutton name="clear" label="C" width="0.5"></a-xybutton>
-            <a-xybutton name="del" label="DEL" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="(" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label=")" width="0.5"></a-xybutton>
+        <a-xybutton name="clear" label="C" width="0.5"></a-xybutton>
+        <a-xybutton name="del" label="DEL" width="0.5"></a-xybutton>
 
-            <a-xybutton class='calc-button' label="7" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="8" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="9" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="/" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="7" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="8" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="9" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="/" width="0.5"></a-xybutton>
 
-            <a-xybutton class='calc-button' label="4" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="5" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="6" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="*" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="4" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="5" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="6" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="*" width="0.5"></a-xybutton>
 
-            <a-xybutton class='calc-button' label="1" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="2" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="3" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="-" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="1" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="2" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="3" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="-" width="0.5"></a-xybutton>
 
-            <a-xybutton class='calc-button' label="0" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="." width="0.5"></a-xybutton>
-            <a-xybutton name="eq" label="=" width="0.5"></a-xybutton>
-            <a-xybutton class='calc-button' label="+" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="0" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="." width="0.5"></a-xybutton>
+        <a-xybutton name="eq" label="=" width="0.5"></a-xybutton>
+        <a-xybutton class='calc-button' label="+" width="0.5"></a-xybutton>
 
-          </a-xycontainer>
-        </a-xywindow>
-    </a-entity>
+      </a-xycontainer>
+    </a-xywindow>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
       <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>

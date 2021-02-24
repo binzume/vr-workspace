@@ -13,15 +13,13 @@
   <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
     <a-entity id="app">
-      <a-entity>
-        <a-xywindow camera-app-window scale='0.2 0.2 0.2' title="Camera" width="4" height="3" position="0 1.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
-          <a-video class="screen" width="4" height="3" camera-src="#cam01" material="npot:true;shader: flat;"></a-video>
-        </a-xywindow>
-        <a-box width="0.04" height="0.04" depth="0.06" position="-0.3 1.9 -0.8" color="#666" xy-drag-control>
-          <a-cone color="#333" height="0.03" radius-bottom="0.016" radius-top="0.006" position="0 0 -0.03" rotation="90 0 0"></a-cone>
-          <a-entity sub-camera id="cam01"></a-entity>
-        </a-box>
-      </a-entity>
+      <a-xywindow camera-app-window scale='0.2 0.2 0.2' title="Camera" width="4" height="3" position="0 1.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
+        <a-video class="screen" width="4" height="3" camera-src="#cam01" material="npot:true;shader: flat;"></a-video>
+      </a-xywindow>
+      <a-box width="0.04" height="0.04" depth="0.06" position="-0.3 1.9 -0.8" color="#666" xy-drag-control>
+        <a-cone color="#333" height="0.03" radius-bottom="0.016" radius-top="0.006" position="0 0 -0.03" rotation="90 0 0"></a-cone>
+        <a-entity sub-camera id="cam01"></a-entity>
+      </a-box>
     </a-entity>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">

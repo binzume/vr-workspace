@@ -13,11 +13,9 @@
   <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
     <a-entity id="app">
-      <a-entity>
-        <a-xywindow game-main scale='0.2 0.2 0.2' title="Game Menu" width="2" height="3" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
-          <a-xybutton name="debug-button" label="Debug" width="1"></a-xybutton>
-        </a-xywindow>
-      </a-entity>
+      <a-xywindow game-main scale='0.2 0.2 0.2' title="Game Menu" width="2" height="3" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
+        <a-xybutton name="debug-button" label="Debug" width="1"></a-xybutton>
+      </a-xywindow>
     </a-entity>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">

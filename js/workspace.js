@@ -205,7 +205,8 @@ class AppManager {
 
 		// TODO: document.importNode()
 		let wrapper = document.createElement('div');
-		wrapper.innerHTML = template.innerHTML;
+		template.id = '';
+		wrapper.innerHTML = ['SCRIPT', 'TEMPLATE'].includes(template.tagName) ? template.innerHTML : template.outerHTML;
 		let first = wrapper.firstElementChild;
 		for (let el of Array.from(wrapper.children)) {
 			(parent || document.querySelector('a-scene')).appendChild(el);
@@ -675,7 +676,6 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 			let menu = /** @type {import("aframe").Entity} */(document.getElementById('mainMenu'));
 			if (!menu) {
 				menu = await appManager.launch('main-menu', null, { disableWindowLocator: true });
-				menu.setAttribute('scale', { x: 0.2, y: 0.2, z: 0.2 });
 			}
 			let distance = 1.5;
 			let sceneEl = document.querySelector('a-scene');
