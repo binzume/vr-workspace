@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Storage Manager</title>
+  <script src="settings.js" type='module'></script>
+</head>
+
+<body>
+
+  <h1>Storage Settings</h1>
+
+  <h2>Google Drive</h2>
+
+  <ul>
+    <li>Status: <span id='google-drive-status'>?</span></li>
+    <li><a href="/googledrivetest/">Connect to Google Drive</a></li>
+    <li style="visibility:hidden">
+      <button id='google-drive-login'>Lgoin</button> You should allow PopUp window to login
+    </li>
+  </ul>
+
+  <h2>Webkit Filesystem(Local)</h2>
+
+  <ul>
+    <li>Status: <span id='webkit-filesystem-status'>?</span></li>
+    <li>RequstQuota:
+      <select id='webkit-filesystem-size'>
+        <option value='10'>10MB</option>
+        <option value='100'>100MB</option>
+        <option value='500'>500MB</option>
+      </select>
+      <button id='webkit-filesystem-request'>Request</button>
+    </li>
+  </ul>
+
+  Files:
+
+  <ul id='webkit-filesystem-files'></ul>
+
+  <button id='webkit-filesystem-add'>Add File</button>
+</body>
+
+</html>

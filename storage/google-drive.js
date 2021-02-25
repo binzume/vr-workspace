@@ -6,23 +6,16 @@
 
 const gapiUrl = 'https://apis.google.com/js/api.js?onload=gapiLoaded';
 const callbackName = 'gapiLoaded';
+const clientIds = {
+    "http://localhost:8080": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
+    "https://binzume.github.io": "86954684848-okobt1r6kedh2cskabcgmbbqe0baphjb.apps.googleusercontent.com"
+};
 
-class GoogleDrive {
-    constructor(clientId) {
-        this.params = {
-            'client_id': clientId,
-            'scope': 'https://www.googleapis.com/auth/drive'
-        };
+export class GoogleDrive {
+    constructor(apiLoader) {
     }
-    async init(signIn = true) {
-        await new Promise((resolve, _) => gapi.load('client:auth2', resolve));
-        let auth = await gapi.auth2.init(this.params);
-        if (!auth.isSignedIn.get()) {
-            if (!signIn) return false;
-            await auth.signIn();
-        }
+    async init() {
         await gapi.client.load("drive", "v3");
-        return true;
     }
     signOut() {
         gapi.auth2.getAuthInstance().signOut();
@@ -175,36 +168,65 @@ class GoogleDriveFileList {
     }
 }
 
-export function install() {
-    const clientIds = {
-        "http://localhost:8080": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
-        "https://binzume.github.io": "86954684848-okobt1r6kedh2cskabcgmbbqe0baphjb.apps.googleusercontent.com"
-    };
-    if (!clientIds[location.origin]) {
+export class GoogleApiLoader {
+    available() {
+        return clientIds[location.origin] !== undefined;
+    }
+
+    load(force = false) {
+        if (!force && GoogleApiLoader._promise) {
+            return GoogleApiLoader._promise;
+        }
+        return GoogleApiLoader._promise = new Promise((resolve) => {
+            globalThis[callbackName] = () => {
+                delete globalThis[callbackName];
+                resolve();
+            };
+            let gapiScript = document.createElement('script');
+            gapiScript.src = gapiUrl;
+            gapiScript.async = true;
+            document.body.append(gapiScript);
+        });
+    }
+
+    async auth(scope, signIn = true) {
+        await this.load();
+        let authParams = {
+            'client_id': clientIds[location.origin],
+            'scope': scope
+        };
+        await new Promise((resolve) => gapi.load('client:auth2', resolve));
+        let auth = await gapi.auth2.init(authParams);
+        if (!auth.isSignedIn.get()) {
+            if (!signIn) return false;
+            await auth.signIn();
+        }
+        return true;
+    }
+}
+
+async function install() {
+    let apiLoader = new GoogleApiLoader();
+    if (!apiLoader.available()) {
         console.log("No clientId for Google Drive: " + location.origin);
         return;
     }
-    globalThis[callbackName] = async () => {
-        globalThis.storageAccessors = globalThis.storageAccessors || {};
-        let drive = new GoogleDrive(clientIds[location.origin]);
-        if (!await drive.init(false)) {
-            console.log("drive unavailable");
-            return;
-        }
-        console.log('gapi init');
 
-        storageAccessors["GoogleDrive"] = {
-            name: "Google Drive",
-            root: 'root',
-            shortcuts: {},
-            getList: (folder, options) => new GoogleDriveFileList(folder, options, drive)
-        };
+    if (!await apiLoader.auth('https://www.googleapis.com/auth/drive', false)) {
+        console.log("not logged-in");
+        return;
+    }
+
+    let drive = new GoogleDrive();
+    await drive.init();
+
+    globalThis.storageAccessors = globalThis.storageAccessors || {};
+    storageAccessors["GoogleDrive"] = {
+        name: "Google Drive",
+        root: 'root',
+        shortcuts: {},
+        getList: (folder, options) => new GoogleDriveFileList(folder, options, drive)
     };
-
-    let gapiScript = document.createElement('script');
-    gapiScript.src = gapiUrl;
-    gapiScript.async = true;
-    document.body.append(gapiScript);
 }
 
 install();

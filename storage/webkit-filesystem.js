@@ -1,11 +1,15 @@
 // https://developer.chrome.com/docs/apps/offline_storage/
 
-class WebkitFileSystemWrapper {
+export class WebkitFileSystemWrapper {
     constructor(type) {
         this._type = type;
         this._storage = type == window.PERSISTENT ? navigator.webkitPersistentStorage : navigator.webkitTemporaryStorage;
         // window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
         // window.directoryEntry = window.directoryEntry || window.webkitDirectoryEntry;
+    }
+
+    available() {
+        return this._type !== undefined && this._storage !== undefined && window.webkitRequestFileSystem !== undefined;
     }
 
     async quota() {
@@ -14,7 +18,7 @@ class WebkitFileSystemWrapper {
     }
 
     async requestQuota(bytes) {
-        return new Promise((resolve, reject) => this._storage.requestQuota(resolve, reject));
+        return new Promise((resolve, reject) => this._storage.requestQuota(bytes, resolve, reject));
     }
 
     async requestFileSystem(bytes) {
@@ -29,7 +33,7 @@ class WebkitFileSystemWrapper {
         return new Promise((resolve, reject) => this.filesystem.root.getDirectory(path, resolve, reject));
     }
 
-    async files(dirPath) {
+    async entries(dirPath) {
         if (!this.filesystem) {
             await this.requestFileSystem();
         }
@@ -64,7 +68,7 @@ class WebkitFileSystemWrapperFileList {
     }
 
     async init() {
-        let entries = await this._storage.files(this._folder);
+        let entries = await this._storage.entries(this._folder);
         let files = await Promise.all(entries.map(entry => {
             return new Promise((resolve, reject) => entry.file(f => resolve([entry, f]), reject));
 
@@ -78,21 +82,20 @@ class WebkitFileSystemWrapperFileList {
     }
 }
 
-export async function install() {
+async function install() {
+    let storageType = window.PERSISTENT;
+    let storageWrapper = new WebkitFileSystemWrapper(storageType);
 
-    if (!navigator.webkitPersistentStorage || !window.webkitRequestFileSystem) {
-        console.log("webkitPersistentStorage is not supported.");
+    if (!storageWrapper.available()) {
+        console.log("webkitFileSystem is not supported.");
         return;
     }
 
-    let storageWrapper = new WebkitFileSystemWrapper(window.PERSISTENT);
     let quota = await storageWrapper.quota();
     if (quota.grantedBytes == 0) {
         console.log("no storage quota.");
         return;
     }
-
-    console.log(quota.grantedBytes, quota.usedBytes);
 
     // const storageSize = 1024 * 1024 * 10;
     // await storageWrapper.requestQuota(storageSize);
