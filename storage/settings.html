@@ -6,41 +6,60 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Storage Manager</title>
   <script src="settings.js" type='module'></script>
+  <link rel="stylesheet" type="text/css" href="settings.css" />
 </head>
 
 <body>
 
-  <h1>Storage Settings</h1>
+  <header>
+    Storage Manager
+  </header>
 
-  <h2>Google Drive</h2>
+  <div id='content'>
 
-  <ul>
-    <li>Status: <span id='google-drive-status'>?</span></li>
-    <li><a href="/googledrivetest/">Connect to Google Drive</a></li>
-    <li style="visibility:hidden">
-      <button id='google-drive-login'>Lgoin</button> You should allow PopUp window to login
-    </li>
-  </ul>
+    <div id="menu-pane">
 
-  <h2>Webkit Filesystem(Local)</h2>
 
-  <ul>
-    <li>Status: <span id='webkit-filesystem-status'>?</span></li>
-    <li>RequstQuota:
-      <select id='webkit-filesystem-size'>
-        <option value='10'>10MB</option>
-        <option value='100'>100MB</option>
-        <option value='500'>500MB</option>
-      </select>
-      <button id='webkit-filesystem-request'>Request</button>
-    </li>
-  </ul>
+      <h2>Google Drive</h2>
 
-  Files:
+      <ul class='simple'>
+        <li>Status: <span id='google-drive-status'>?</span></li>
+        <li style="visibility:hidden">
+          <button id='google-drive-login'>Lgoin</button>
+        </li>
+        <li><a href="/googledrivetest/">Connect to Google Drive</a></li>
+        <li><a href="#list:GoogleDrive">Select</a></li>
+      </ul>
 
-  <ul id='webkit-filesystem-files'></ul>
+      <h2>WebkitFileSystem(Local)</h2>
 
-  <button id='webkit-filesystem-add'>Add File</button>
+      <ul class='simple'>
+        <li>Status: <span id='webkit-filesystem-status'>?</span></li>
+        <li>RequstQuota:
+          <select id='webkit-filesystem-size'>
+            <option value='10'>10MB</option>
+            <option value='100'>100MB</option>
+            <option value='500'>500MB</option>
+          </select>
+          <button id='webkit-filesystem-request'>Request</button>
+        </li>
+        <li><a href="#list:WebkitFileSystem">Select</a></li>
+      </ul>
+
+    </div>
+
+    <div id="main-pane">
+
+      Files:
+
+      <ul id='item-list' class='simple'></ul>
+
+      <button id='webkit-filesystem-add'>Add File</button>
+
+    </div>
+
+  </div>
+
 </body>
 
 </html>

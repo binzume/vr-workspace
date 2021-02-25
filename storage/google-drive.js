@@ -205,16 +205,16 @@ export class GoogleApiLoader {
     }
 }
 
-async function install() {
+export async function install() {
     let apiLoader = new GoogleApiLoader();
     if (!apiLoader.available()) {
         console.log("No clientId for Google Drive: " + location.origin);
-        return;
+        return false;
     }
 
     if (!await apiLoader.auth('https://www.googleapis.com/auth/drive', false)) {
         console.log("not logged-in");
-        return;
+        return false;
     }
 
     let drive = new GoogleDrive();
@@ -227,6 +227,7 @@ async function install() {
         shortcuts: {},
         getList: (folder, options) => new GoogleDriveFileList(folder, options, drive)
     };
+    return true;
 }
 
 install();

@@ -1,12 +1,14 @@
 
-import { WebkitFileSystemWrapper } from './webkit-filesystem.js';
-import { GoogleApiLoader, GoogleDrive } from './google-drive.js';
+import { WebkitFileSystemWrapper, install as installWebkitFs } from './webkit-filesystem.js';
+import { GoogleApiLoader, install as installGoogleDrive } from './google-drive.js';
 
 const storageType = window.PERSISTENT; // PERSISTENT or TEMPORARY;
 const authScope = 'https://www.googleapis.com/auth/drive';
 
 let googleApiLoader = new GoogleApiLoader();
 let storageWrapper = new WebkitFileSystemWrapper(storageType);
+
+let currentStorage = 'WebkitFileSystem';
 
 async function chedckGoogleDriveStatus() {
     let statusEl = document.querySelector('#google-drive-status');
@@ -25,9 +27,12 @@ async function chedckGoogleDriveStatus() {
     }
 
     statusEl.innerText = "Initializing GoogleDriveAPI...";
-    let drive = new GoogleDrive(googleApiLoader);
-    await drive.init();
+    await installGoogleDrive();
+
     statusEl.innerText = "Ok";
+    if (currentStorage == 'GoogleDrive') {
+        await updateFileList();
+    }
 }
 
 async function chedckWebkitFileSystemStatus() {
@@ -44,41 +49,63 @@ async function chedckWebkitFileSystemStatus() {
         return;
     }
 
+    statusEl.innerText = "Initializing WebkitFs...";
+    await installWebkitFs();
+
     statusEl.innerText = `Ok (Usage: ${quota.usedBytes} / ${quota.grantedBytes}B)`;
 
-    // await storageWrapper.writeFile("test.txt", new Blob(["Hello!"]));
-
-    let filesEl = document.querySelector('#webkit-filesystem-files');
-    filesEl.innerHTML = '';
-    let entries = await storageWrapper.entries('');
-
-    for (let entry of entries) {
-        let li = document.createElement('li');
-        li.innerText = entry.name;
-        let deleteButton = document.createElement('button');
-        deleteButton.innerText = 'Remove';
-        li.append(deleteButton);
-        filesEl.append(li);
-
-        if (entry.isFile) {
-            entry.file(f => {
-                let a = document.createElement('a');
-                a.href = URL.createObjectURL(f);
-                a.innerText = 'GET';
-                li.append(a);
-            });
-        }
-
-        deleteButton.addEventListener('click', async (ev) => {
-            ev.preventDefault();
-            await new Promise((resolve, reject) => entry.remove(resolve, reject));
-            console.log("Removed " + entry.fullPath);
-            filesEl.removeChild(li);
-        })
+    if (currentStorage == 'WebkitFileSystem') {
+        await updateFileList();
     }
 }
 
+async function updateFileList(storage, path) {
+    currentStorage = storage || currentStorage;
+
+    let filesEl = document.querySelector('#item-list');
+    filesEl.innerHTML = '';
+
+    if (!globalThis.storageAccessors) {
+        return;
+    }
+    let accessor = globalThis.storageAccessors[currentStorage];
+    if (!accessor) {
+        return;
+    }
+    path = path || accessor.root;
+
+    let list = accessor.getList(path, {});
+    await list.init();
+
+    for (let item of list.items) {
+        let li = document.createElement('li');
+        li.innerText = item.name;
+
+        if (item._entry) {
+            let deleteButton = document.createElement('button');
+            deleteButton.innerText = 'Remove';
+            li.append(deleteButton);
+            deleteButton.addEventListener('click', async (ev) => {
+                ev.preventDefault();
+                await new Promise((resolve, reject) => item._entry.remove(resolve, reject));
+                console.log("Removed " + item._entry.fullPath);
+                filesEl.removeChild(li);
+            })
+        }
+
+        if (item.url) {
+            let a = document.createElement('a');
+            a.href = item.url;
+            a.innerText = 'GET';
+            li.append(a);
+        }
+        filesEl.append(li);
+    }
+}
+
+
 window.addEventListener('DOMContentLoaded', async (ev) => {
+
     chedckGoogleDriveStatus();
     document.querySelector('#google-drive-login').addEventListener('click', async (ev) => {
         ev.preventDefault();
@@ -106,9 +133,28 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
                 storageWrapper.writeFile(file.name, file);
             }
             document.body.removeChild(inputEl);
-            chedckWebkitFileSystemStatus();
+            chedckWebkitFileSystemStatus(); // update quata
         });
         document.body.appendChild(inputEl).click();
     });
+
+
+    let onHashChanged = () => {
+        if (!location.hash) {
+            return;
+        }
+        let fragment = location.hash.slice(1);
+        let m = fragment.match(/list:(\w+)\/?(.*)/)
+        if (m) {
+            if (currentStorage != m[1]) {
+                updateFileList(m[1], m[2]);
+            }
+        }
+    };
+    onHashChanged();
+    window.addEventListener('hashchange', (function (ev) {
+        ev.preventDefault();
+        onHashChanged();
+    }), false);
 
 }, { once: true });

@@ -62,18 +62,24 @@ class WebkitFileSystemWrapperFileList {
     constructor(folder, options, storage) {
         this._storage = storage;
         this._folder = folder;
+        this.itemPath = folder || 'WebkitFileSystem';
         this.items = [];
         this.size = -1;
-        this.name = folder;
     }
 
     async init() {
         let entries = await this._storage.entries(this._folder);
         let files = await Promise.all(entries.map(entry => {
+            if (!entry.isFile) {
+                return Promise.resolve([entry, null]);
+            }
             return new Promise((resolve, reject) => entry.file(f => resolve([entry, f]), reject));
-
         }));
-        this.items = files.map(([entry, file]) => ({ name: entry.name, path: entry.fullPath, type: file.type, size: file.size, url: URL.createObjectURL(file) }));
+        this.items = files.map(([entry, file]) => ({
+            name: entry.name, path: entry.fullPath, type: file?.type, size: file?.size,
+            url: file && URL.createObjectURL(file),
+            _entry: entry
+        }));
         this.size = this.items.length;
     }
 
@@ -82,19 +88,19 @@ class WebkitFileSystemWrapperFileList {
     }
 }
 
-async function install() {
+export async function install() {
     let storageType = window.PERSISTENT;
     let storageWrapper = new WebkitFileSystemWrapper(storageType);
 
     if (!storageWrapper.available()) {
         console.log("webkitFileSystem is not supported.");
-        return;
+        return false;
     }
 
     let quota = await storageWrapper.quota();
     if (quota.grantedBytes == 0) {
         console.log("no storage quota.");
-        return;
+        return false;
     }
 
     // const storageSize = 1024 * 1024 * 10;
@@ -110,6 +116,7 @@ async function install() {
         getList: (folder, options) => new WebkitFileSystemWrapperFileList(folder, options, storageWrapper),
         saveFile: (path, blob) => storageWrapper.writeFile(path, blob),
     };
+    return true;
 }
 
 install();
