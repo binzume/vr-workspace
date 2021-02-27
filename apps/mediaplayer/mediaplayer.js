@@ -1,12 +1,4 @@
-"use strict";
-
-if (typeof AFRAME === 'undefined') {
-	throw 'AFRAME is not loaded.';
-}
-
-/** 
- * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
- */
+// @ts-check
 
 class BaseFileList {
 	/**
@@ -463,6 +455,7 @@ AFRAME.registerComponent('media-selector', {
 					let t = item.type.split("/")[0];
 					return t == "image" || t == "video" || t == "audio";
 				});
+				// @ts-ignore
 				this.el.sceneEl.systems["media-player"].playContent(item, cursor);
 			}
 		});
@@ -472,7 +465,7 @@ AFRAME.registerComponent('media-selector', {
 		});
 
 		this._byName('option-menu').setAttribute('xyselect', 'select', -1);
-		this._byName('option-menu').addEventListener('change', (/** @type {CustomEvent} */ev) => {
+		this._byName('option-menu').addEventListener('change', (ev) => {
 			if (ev.detail.index == 0) {
 				this._openList(this.data.storage, this.data.path, true);
 			} else if (ev.detail.index == 1) {
@@ -559,8 +552,10 @@ AFRAME.registerComponent('media-player', {
 		this.loadingTimer = null;
 		this.screen = this.el.querySelector(this.data.screen);
 		this.touchToPlay = false;
+		// @ts-ignore
 		this.system.registerPlayer(this);
 
+		// @ts-ignore
 		this.onclicked = ev => this.system.selectPlayer(this);
 		this.el.addEventListener('click', this.onclicked);
 		this.screen.addEventListener('click', ev => this.togglePause());
@@ -765,6 +760,7 @@ AFRAME.registerComponent('media-player', {
 	},
 	remove: function () {
 		clearTimeout(this.loadingTimer);
+		// @ts-ignore
 		this.system.unregisterPlayer(this);
 		this.screen.removeAttribute("material"); // to avoid texture leaks.
 		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
@@ -898,11 +894,13 @@ AFRAME.registerComponent('media-controller', {
 	_updateProgress() {
 		if (this.player.mediaEl && this.player.mediaEl.duration) {
 			this._byName("seek").setAttribute('max', this.player.mediaEl.duration);
+			// @ts-ignore
 			this._byName("seek").value = this.player.mediaEl.currentTime;
 		}
 	},
 	_updatePlaybackRate(rate) {
 		this._byName("playbackRateText").setAttribute("value", rate.toFixed(1));
+		// @ts-ignore
 		this._byName("playbackRate").value = rate;
 		this.player.el.setAttribute('media-player', 'playbackRate', rate);
 	},
@@ -979,7 +977,7 @@ AFRAME.registerComponent('stereo-texture', {
 		}
 	},
 	_makeObj(layer, name) {
-		let obj = this.el.getObject3D("mesh").clone();
+		let obj = /** @type {THREE.Mesh} */ (this.el.getObject3D("mesh").clone());
 		obj.geometry = obj.geometry.clone();
 		obj.layers.set(layer);
 		this.el.setObject3D(name, obj);

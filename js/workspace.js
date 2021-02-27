@@ -1,9 +1,10 @@
-"use strict";
+// @ts-check
 
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
+/// <reference path="types.d.ts" />
 /** 
- * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;contentTypes:string[]}} AppInfo
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
+ * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;contentTypes:string[]}} AppInfo
  */
 class AppManager {
 	constructor() {
@@ -34,7 +35,9 @@ class AppManager {
 		this.apps = apps.concat(this._loadFromLocalStorage());
 
 		for (let script of document.querySelectorAll('head>script')) {
+			// @ts-ignore
 			if (script.src) {
+				// @ts-ignore
 				this.loadedModules.add(script.src);
 			}
 			if (script.id) {
@@ -72,10 +75,7 @@ class AppManager {
 			console.log('already exists:' + app.wid);
 			return null;
 		}
-		let el = await this.instantiate(app.url, app.type, sceneEl);
-		if (app.wid) {
-			el.id = app.wid;
-		}
+		let el = await this.instantiate(app.url, app.type, sceneEl, app.wid);
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
@@ -148,8 +148,10 @@ class AppManager {
 	 * @param {string} url
 	 * @param {string} apptype
 	 * @param {*} [parent]
+	 * @param {string} [instanceId]
+	 * @returns {Promise<AFRAME.AEntity>}
 	 */
-	async instantiate(url, apptype, parent) {
+	async instantiate(url, apptype, parent, instanceId) {
 		let [srcUrl, id] = url.split('#');
 		let base = new URL(location.href);
 		let srcSceneEl = null;
@@ -159,6 +161,7 @@ class AppManager {
 			template = document.getElementById(id);
 		} else {
 			let assets = document.querySelector('a-assets');
+			// @ts-ignore
 			let response = await new Promise((resolve, reject) => assets.fileLoader.load(srcUrl, resolve, null, reject));
 			let doc = new DOMParser().parseFromString(response.replace(/\$\{baseUrl\}/g, srcUrl.replace(/\/[^/]+$/, '/')), 'text/html');
 			let baseEl = doc.createElement('base');
@@ -202,21 +205,18 @@ class AppManager {
 					}
 				}
 			}
-			parent = document.querySelector('#env');
-			while (parent.firstChild) {
-				parent.removeChild(parent.lastChild);
-			}
+			let old = document.querySelector('#env');
+			old && old.parentNode.removeChild(old);
+			instanceId = 'env';
 		}
 
 		// TODO: document.importNode()
 		let wrapper = document.createElement('div');
-		template.id = '';
 		wrapper.innerHTML = ['SCRIPT', 'TEMPLATE'].includes(template.tagName) ? template.innerHTML : template.outerHTML;
-		let first = wrapper.firstElementChild;
-		for (let el of Array.from(wrapper.children)) {
-			(parent || document.querySelector('a-scene')).appendChild(el);
-		}
-		return /** @type {import("aframe").Entity} */ (first);
+		let appEl = /** @type {AFRAME.AEntity} */ (wrapper.firstElementChild);
+		appEl.id = instanceId || '';
+		(parent || document.querySelector('a-scene')).appendChild(appEl);
+		return appEl;
 	}
 
 	/**
@@ -294,7 +294,7 @@ AFRAME.registerComponent('apps-panel', {
 				el.setAttribute('label', apps[position].name);
 			}
 		});
-		listEl.addEventListener('clickitem', async (/** @type {CustomEvent} */ ev) => {
+		listEl.addEventListener('clickitem', async (ev) => {
 			this.el.parentNode.removeChild(this.el);
 			appManager.launch(apps[ev.detail.index].id);
 		});
@@ -311,12 +311,12 @@ AFRAME.registerComponent('apps-panel', {
 AFRAME.registerComponent('search-box', {
 	init() {
 		let searchButton = this.el.querySelector('a-xybutton');
-		let searchKeyword = /** @type {HTMLInputElement} */ (this.el.querySelector('a-xyinput'));
+		let searchKeyword = this.el.querySelector('a-xyinput');
 		searchButton.addEventListener('click', (ev) => {
 			this._search(searchKeyword.value);
 		});
 
-		searchKeyword.addEventListener('keydown', ( /** @type {KeyboardEvent} */ ev) => {
+		searchKeyword.addEventListener('keydown', (ev) => {
 			if (ev.code == 'Enter' && searchKeyword.value != '') {
 				this._search(searchKeyword.value);
 			}
@@ -363,11 +363,13 @@ AFRAME.registerComponent('debug-log', {
 		let commandEl = this._elByName('command');
 		commandEl && commandEl.addEventListener('keydown', (ev) => {
 			if (ev.code == 'Enter') {
+				// @ts-ignore
 				let cmd = commandEl.value;
 				console.log('>', cmd);
 				if (cmd) {
 					console.log(eval(cmd));
 				}
+				// @ts-ignore
 				commandEl.value = '';
 			}
 		});
@@ -400,7 +402,7 @@ AFRAME.registerComponent('debug-log', {
 	 * @param {string} name 
 	 */
 	_elByName(name) {
-		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
+		return this.el.querySelector("[name=" + name + "]");
 	}
 });
 
@@ -414,7 +416,7 @@ AFRAME.registerComponent('camera-control', {
 		this.el.sceneEl.addEventListener('exit-vr', ev => this.resetPosition());
 		this.el.sceneEl.addEventListener('enter-vr', ev => this.resetPosition());
 		this.resetPosition();
-		let cursorEl = Array.from(document.querySelectorAll('[cursor]')).find(el => el.getAttribute('cursor').rayOrigin == 'mouse');
+		let cursorEl = Array.from(this.el.sceneEl.querySelectorAll('[cursor]')).find(el => el.getAttribute('cursor').rayOrigin == 'mouse');
 		let canvasEl = this.el.sceneEl.canvas;
 		let dragX = 0, dragY = 0;
 		let lookAt = new THREE.Vector3(0, 0, 0);
@@ -545,7 +547,7 @@ AFRAME.registerComponent('position-controls', {
 		}
 		let changed = [];
 		el.addEventListener('gripdown', ev => {
-			document.querySelectorAll("[xy-drag-control]").forEach(el => {
+			el.sceneEl.querySelectorAll("[xy-drag-control]").forEach(el => {
 				el.components['xy-drag-control'].postProcess = (targetObj, /** @type {CustomEvent} */ ev) => {
 					let { origin, direction } = ev.detail.raycaster.ray;
 					let direction0 = ev.detail.prevRay.direction;
@@ -565,7 +567,7 @@ AFRAME.registerComponent('position-controls', {
 			});
 			changed = [];
 		});
-		el.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('thumbstickmoved', (/** @type {CustomEvent} */ ev) => {
+		el.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('thumbstickmoved', (ev) => {
 			let direction = ev.target.components.raycaster.raycaster.ray.direction;
 			if (this.data.axismove == "translation") {
 				let rot = Math.atan2(direction.x, direction.z);
@@ -612,6 +614,7 @@ AFRAME.registerComponent('window-locator', {
 	},
 	update(oldData) {
 		let el = this.el;
+		// @ts-ignore
 		let windows = el.sceneEl.systems.xywindow.windows;
 
 		let pos = this.el.object3D.position;
@@ -665,7 +668,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		if (['bvh'].includes(ext)) {
 			let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
 			if (activeModel) {
-				activeModel.setAttribute('vrm-bvh', { src: item.url });
+				activeModel.setAttribute('vrm-bvh', 'src', item.url);
 				return true;
 			}
 		}
@@ -674,16 +677,17 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 
 	appManager.launch('main-menu', null, { disableWindowLocator: true });
 
+	let sceneEl = document.querySelector('a-scene');
+
 	// gesture
-	document.body.addEventListener('gesture', async (/** @type {CustomEvent} */ ev) => {
+	sceneEl.addEventListener('gesture', async (ev) => {
 		console.log(ev.detail.name);
 		if (ev.detail.name == 'L' || ev.detail.name == 'CLICK') {
-			let menu = /** @type {import("aframe").Entity} */(document.getElementById('mainMenu'));
+			let menu = sceneEl.querySelector('#mainMenu');
 			if (!menu) {
 				menu = await appManager.launch('main-menu', null, { disableWindowLocator: true });
 			}
 			let distance = 1.5;
-			let sceneEl = document.querySelector('a-scene');
 			let camera = sceneEl.camera;
 			let targetObj = menu.object3D;
 			let tr = new THREE.Matrix4().getInverse(targetObj.parent.matrixWorld).multiply(camera.matrixWorld);
