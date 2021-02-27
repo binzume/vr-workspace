@@ -117,23 +117,28 @@ class AppManager {
 	/**
 	 * @param {ContentInfo} contentInfo
 	 */
-	openContent(contentInfo) {
+	openContent(contentInfo, options = {}) {
 		for (let handler of this.contentHandlers) {
 			if (handler(contentInfo)) {
 				return true;
 			}
 		}
-		let mimeType = contentInfo.type.split(';')[0];
-		if (mimeType == '') {
+		let contentType = contentInfo.type.split(';')[0];
+		if (contentType == '') {
 			// TODO: remove this
 			let m = contentInfo.name.match(/\.(\w+)$/);
 			if (m) {
-				mimeType = 'application/' + m[1].toLowerCase();
+				contentType = 'application/' + m[1].toLowerCase();
 			}
 		}
-		let app = this.apps.find(app => app.contentTypes && app.contentTypes.includes(mimeType));
+		let app =
+			this.apps.find(app => app.contentTypes && app.contentTypes.includes(contentType)) ||
+			this.apps.find(app => app.contentTypes && app.contentTypes.some(t =>
+				t.includes('*') && new RegExp(t.replace('*', '[^/]+')).test(contentType) // TODO: glob
+			));
 		if (app) {
-			this.launch(app.id, null, { content: contentInfo });
+			options.content = contentInfo;
+			this.launch(app.id, null, options);
 			return true;
 		}
 		return false;
