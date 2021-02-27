@@ -140,9 +140,6 @@ class GoogleDriveFileList {
     async getFileUrl(file) {
         return URL.createObjectURL(await this.drive.fetch(file.id));
     }
-    fetch(file, start, end) {
-        return this.drive.fetch(file.id, start, end);
-    }
     async _load() {
         if (this.loadPromise !== null) return await this.loadPromise;
         this.loadPromise = (async () => {
