@@ -12,7 +12,7 @@
 <body>
 
   <header>
-    Storage Manager
+    <h1>Storage Manager</h1>
   </header>
 
   <div id='content'>
@@ -27,7 +27,6 @@
         <li style="visibility:hidden">
           <button id='google-drive-login'>Lgoin</button>
         </li>
-        <li><a href="/googledrivetest/">Connect to Google Drive</a></li>
         <li><a href="#list:GoogleDrive">Select</a></li>
       </ul>
 
@@ -50,11 +49,13 @@
 
     <div id="main-pane">
 
-      Files:
+      <h2 id="item-list-title">Files</h2>
 
       <ul id='item-list' class='simple'></ul>
 
-      <button id='webkit-filesystem-add'>Add File</button>
+      <div id='file-menu'>
+        <button id='file-add-button' class='file-menu-write'>Add File</button>
+      </div>
 
     </div>
 

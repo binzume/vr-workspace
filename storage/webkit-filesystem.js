@@ -54,7 +54,8 @@ export class WebkitFileSystemWrapper {
         }
         let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, { create: true }, resolve, reject));
         let writer = await new Promise((resolve, reject) => file.createWriter(resolve, reject));
-        writer.write(content);
+        await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.truncate(0); });
+        await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.write(content); });
     }
 }
 
@@ -63,22 +64,31 @@ class WebkitFileSystemWrapperFileList {
         this._storage = storage;
         this._folder = folder;
         this.itemPath = folder || 'WebkitFileSystem';
+        this.writable = true;
         this.items = [];
         this.size = -1;
     }
 
     async init() {
         let entries = await this._storage.entries(this._folder);
-        let files = await Promise.all(entries.map(entry => {
-            if (!entry.isFile) {
-                return Promise.resolve([entry, null]);
-            }
-            return new Promise((resolve, reject) => entry.file(f => resolve([entry, f]), reject));
+        let getFile = (ent) => ent.isFile ? new Promise((resolve, reject) => ent.file(resolve, reject)) : Promise.resolve(null);
+        let files = await Promise.all(entries.map(async (entry) => {
+            return [entry, await getFile(entry)];
         }));
+        let storage = this._storage;
         this.items = files.map(([entry, file]) => ({
-            name: entry.name, path: entry.fullPath, type: file?.type, size: file?.size,
+            name: entry.name,
+            type: entry.isFile ? file.type : 'directory',
+            size: file?.size,
             url: file && URL.createObjectURL(file),
-            _entry: entry
+            updatedTime: new Date(file?.lastModified).toISOString(),
+            remove() { return new Promise((resolve, reject) => this._entry.remove(resolve, reject)); },
+            async fetch(start, end) {
+                let file = await getFile(this._entry);
+                return start != null ? file.slice(start, end) : file;
+            },
+            update(blob) { return storage.writeFile(this._entry.fullPath, blob); },
+            _entry: entry,
         }));
         this.size = this.items.length;
     }
@@ -114,7 +124,7 @@ export async function install() {
         writable: true,
         shortcuts: {},
         getList: (folder, options) => new WebkitFileSystemWrapperFileList(folder, options, storageWrapper),
-        saveFile: (path, blob) => storageWrapper.writeFile(path, blob),
+        writeFile: (path, blob) => storageWrapper.writeFile(path, blob),
     };
     return true;
 }

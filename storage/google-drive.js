@@ -59,9 +59,9 @@ export class GoogleDrive {
         });
     }
     async delete(fileId) {
-        return await gapi.client.drive.files.delete({
+        return (await gapi.client.drive.files.delete({
             fileId: fileId
-        }).status == 204;
+        })).status == 204;
     }
     getFileMediaUrl(fileId) {
         return "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media";
@@ -69,11 +69,23 @@ export class GoogleDrive {
     async fetch(fileId, start, end) {
         let url = this.getFileMediaUrl(fileId);
         let headers = { 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token };
-        if (start) {
+        if (start != null) {
             headers.range = 'bytes=' + start + '-' + (end || '');
         }
         let response = await fetch(url, { headers: new Headers(headers) });
         if (!response.ok) throw new Error(response.statusText);
+        return response;
+    }
+    async update(fileId, blob) {
+        let url = "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media";
+        let headers = { 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token };
+        if (blob.type) {
+            headers['Content-Type'] = blob.type;
+        }
+
+        let response = await fetch(url, { method: 'PATCH', headers: new Headers(headers), body: blob });
+        if (!response.ok) throw new Error(response.statusText);
+        console.log(response);
         return response;
     }
     async getFileBlob(fileId) {
@@ -126,7 +138,7 @@ class GoogleDriveFileList {
         return this._getOrNull(position);
     }
     async getFileUrl(file) {
-        return URL.createObjectURL(await this.drive.getFileBlob(file.id));
+        return URL.createObjectURL(await this.drive.fetch(file.id));
     }
     fetch(file, start, end) {
         return this.drive.fetch(file.id, start, end);
@@ -136,6 +148,7 @@ class GoogleDriveFileList {
         this.loadPromise = (async () => {
             let result = await this.drive.getFiles(this.itemPath, 200, this.cursor, this.driveOption);
             this.cursor = result.nextPageToken;
+            let drive = this.drive;
             let files = result.files.map(f => ({
                 type: f.mimeType == "application/vnd.google-apps.folder" ? "folder" : f.mimeType,
                 duration: 0,
@@ -147,6 +160,9 @@ class GoogleDriveFileList {
                 thumbnailUrl: (f.thumbnailLink && !f.thumbnailLink.startsWith("https://docs.google.com/")) ? f.thumbnailLink : null,
                 updatedTime: f.modifiedTime,
                 url: null, // use getFileUrl()
+                fetch(start, end) { return drive.fetch(this.id, start, end); },
+                update(blob) { return drive.update(this.id, blob); },
+                remove() { return drive.delete(this.id); },
             }));
             this.items = this.items.concat(files);
 

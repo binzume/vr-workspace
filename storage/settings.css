@@ -17,6 +17,13 @@ header {
 	box-shadow: 0 6px 6px -6px #777;
 }
 
+header h1{ 
+	margin: 0;
+	padding: 4pt;
+	font-size: 12pt;
+	font-weight: bold;
+}
+
 #content {
 	width: 100%;
 	margin: 30pt auto 0px auto;
@@ -26,15 +33,14 @@ header {
 /* main content */
 #main-pane {
 	margin: 0px;
-	margin-left: 320pt;
+	margin-left: 300pt;
 	padding-bottom: 200pt;
 }
 
 /* menu(left) */
 #menu-pane {
 	position:fixed;
-	width: 300pt;
-	min-width: 300pt;
+	width: 260pt;
 	height: calc(100vh - 30pt);
 	box-sizing: border-box;
 	margin: 0pt;
@@ -151,3 +157,11 @@ ul.grid li .date {
 	color: #888;
 }
 
+
+#file-menu .file-menu-write {
+	display: none;
+}
+
+#file-menu.writable .file-menu-write {
+	display: inline;
+}
