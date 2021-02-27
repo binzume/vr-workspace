@@ -13,7 +13,14 @@
 <body style="background-color: black; color:white;">
   <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
-    <a-xywindow  id="app" notepad-app scale='0.2 0.2 0.2' title="Notepad" width="6" height="3" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
+    <a-xywindow  id="app" notepad-app scale='0.2 0.2 0.2' title="Notepad" width="6" height="3.4" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
+      <a-xycontainer width="6" height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xybutton name="save-button" label="Save" width="0.3"></a-xybutton>
+        <a-xybutton name="undo-button" label="Undo" width="0.3"></a-xybutton>
+        <a-xybutton name="redo-button" label="Redo" width="0.3"></a-xybutton>
+        <a-xybutton name="pgup-button" label="PgUp" width="0.3"></a-xybutton>
+        <a-xybutton name="pgdn-button" label="PgDn" width="0.3"></a-xybutton>
+      </a-xycontainer>
       <a-texteditor name="text" width="6" height="3"></a-texteditor>
     </a-xywindow>
 
