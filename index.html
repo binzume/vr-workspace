@@ -21,7 +21,7 @@
     <a id="main-menu" href="#main-menu-template" class='hidden' data-wid='mainMenu'>MainMenu</a>
     <a id="app-calc" href="apps/calc/template.html">Calculator</a>
     <a id="app-notepad" href="apps/notepad/template.html" data-content-type="text/*">Notepad</a>
-    <a id="app-console" href="#debug-console-template" data-wid='debug-console'>Console</a>
+    <a id="app-console" href="apps/console/console.html" data-wid='debug-console'>Console</a>
     <a id="app-media-selector" href="apps/mediaplayer/template.html#media-selector-template">Storage</a>
     <a id="app-media-player" href="apps/mediaplayer/template.html#media-player-template">MediaPlayer</a>
     <a id="app-vnc" href="apps/vnc/template.html#app-vnc">VNC Client</a>
@@ -30,6 +30,7 @@
     <a id="app-game001" href="apps/game001/template.html">Game001</a>
     <a id="app-camera-test" href="apps/cameratest/template.html">Camera and Screen</a>
     <a id="env-rosso" href="apps/rosso/index.html" data-apptype='env'>env:ROSSO</a>
+    <a id="env-kurage" href="apps/kurage/index.html" data-apptype='env'>env:Kurage</a>
     <a id="env-starrysky" href="apps/starrysky/template.html" data-apptype='env'>env:StarrySky</a>
     <a id="env-physics" href="apps/physics/index.html" data-apptype='env'>env:Physics</a>
     <a id="env-default" href="index.html" data-apptype='env'>env:Default</a>
@@ -52,14 +53,6 @@
       <a-xycontainer width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
         <a-xylabel simple-clock width="3" height="0.6" value="0000-00-00 00:00:00"></a-xylabel>
       </a-xycontainer>
-    </a-xywindow>
-  </script>
-
-  <!-- debug console -->
-  <script type='text/html' id="debug-console-template">
-    <a-xywindow title="Console" debug-log="log:debug-text" xywindow="background:true" width="8" height="4.5" position="1 1 -1.5" scale="0.2 0.2 0.2" xycontainer="direction:column">
-      <a-xylabel name="debug-text" width="8" height="4" anchor="center" wrap-count="80" value=""></a-xylabel>
-      <a-xyinput name="command" width="8" height="0.5"></a-xyinput>
     </a-xywindow>
   </script>
 

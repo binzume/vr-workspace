@@ -6,7 +6,7 @@ WebVR/WebXRで色々試すための環境です．
 
 https://binzume.github.io/vr-workspace/
 
-OculusQuest等で上記URLにアクセスしてください．
+OculusQuest等で上記URLにアクセスして `VR` ボタンをクリックしてください．
 
 - コントローラのトリガーボタンがクリック，グリップボタンがメニュー表示とジェスチャー入力です
 - ウインドウ等のドラッグ中にグリップボタンを押すと対象との距離を操作できます

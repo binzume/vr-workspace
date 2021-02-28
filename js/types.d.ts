@@ -20,6 +20,10 @@ declare module "aframe" {
         ): void;
     }
 
+    export interface Component {
+        [key: string]: any
+    }
+
     export interface Scene {
         addEventListener<K extends keyof EntityEventMap>(
             type: K,

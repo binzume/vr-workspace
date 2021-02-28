@@ -345,67 +345,6 @@ AFRAME.registerComponent('simple-clock', {
 	}
 });
 
-AFRAME.registerComponent('debug-log', {
-	schema: {
-		timestamp: { default: true },
-		lines: { default: 12 }
-	},
-	log: [],
-	orgLog: null,
-	init() {
-		this.orgLog = console.log;
-		console.log = this._addLog.bind(this);
-
-		this._onerror = this._onerror.bind(this);
-		window.addEventListener('error', this._onerror);
-		window.addEventListener('unhandledrejection', this._onerror);
-
-		let commandEl = this._elByName('command');
-		commandEl && commandEl.addEventListener('keydown', (ev) => {
-			if (ev.code == 'Enter') {
-				// @ts-ignore
-				let cmd = commandEl.value;
-				console.log('>', cmd);
-				if (cmd) {
-					console.log(eval(cmd));
-				}
-				// @ts-ignore
-				commandEl.value = '';
-			}
-		});
-	},
-	_addLog(...msg) {
-		this.orgLog(...msg);
-		let header = '';
-		if (this.data.timestamp) {
-			let now = new Date();
-			header = "[" + now.getHours() + ":" + now.getMinutes() + ":" + now.getSeconds() + "]: ";
-		}
-		this.log.push(header + msg.map(m => String(m)).join(' '));
-		if (this.log.length > this.data.lines) this.log.shift();
-		let logEl = this._elByName('debug-text');
-		logEl.setAttribute('value', this.log.join("\n"));
-	},
-	_onerror(ev) {
-		let msg = ev.reason ? ev.reason.message + ' ' + ev.reason.stack : ev.message;
-		if (ev.filename) {
-			msg += ` ${ev.filename}:${ev.line}`;
-		}
-		this._addLog("ERROR: " + msg);
-	},
-	remove() {
-		window.removeEventListener('error', this._onerror);
-		window.removeEventListener('unhandledrejection', this._onerror);
-		console.log = this.orgLog;
-	},
-	/**
-	 * @param {string} name 
-	 */
-	_elByName(name) {
-		return this.el.querySelector("[name=" + name + "]");
-	}
-});
-
 AFRAME.registerComponent('camera-control', {
 	schema: {
 		homePosition: { type: 'vec3', default: { x: 0, y: 0, z: 1 } },
@@ -690,7 +629,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 			let distance = 1.5;
 			let camera = sceneEl.camera;
 			let targetObj = menu.object3D;
-			let tr = new THREE.Matrix4().getInverse(targetObj.parent.matrixWorld).multiply(camera.matrixWorld);
+			let tr = new THREE.Matrix4().copy(targetObj.parent.matrixWorld).invert().multiply(camera.matrixWorld);
 			let pos = ev.detail.center.clone().normalize().multiplyScalar(distance).applyMatrix4(tr);
 
 			menu.setAttribute('position', pos);
