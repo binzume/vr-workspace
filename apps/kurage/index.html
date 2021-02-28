@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>kurage</title>
+  <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
+  <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="kurage.js"></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene fog="type: linear; color: #000; near:10;far:50;" background="color:black" cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
+
+    <a-entity id="env">
+      <a-entity kurage position='0 3 -10' scale='2 2 2' rotation='0 0 20'></a-entity>
+      <a-entity kurage position='8 1 -6' scale='2 2 2' rotation='0 0 150'></a-entity>
+    </a-entity>
+
+    <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
