@@ -4,12 +4,14 @@ import { Entity, Scene } from "aframe"
 
 declare module "aframe" {
     export interface EntityEventMap {
-        clickitem: DetailEvent<{ index: number }>
+        click: DetailEvent<{ intersection: any }>
         keydown: KeyboardEvent
+        keypress: KeyboardEvent
         thumbstickmoved: DetailEvent<{ x: number, y: number }>
+        clickitem: DetailEvent<{ index: number }>
+        change: DetailEvent<{ value: any, index?: number }>
         gesture: DetailEvent<{ name: string, center: any }>
         'app-launch': DetailEvent<any>
-        change: DetailEvent<{ value: any, index?: number }>
     }
 
     export interface Entity {
@@ -36,11 +38,12 @@ declare module "aframe" {
 declare global {
     interface Document {
         activeElement: Entity<any> | Element
+        createElement(tag: 'canvas'): HTMLCanvasElement
     }
     interface Element {
-        querySelector(selectors: 'a-scene'): Scene;
-        querySelector(selectors: 'a-xyinput'): HTMLInputElement;
-        querySelector(selectors: string): Entity<any>;
-        querySelectorAll(selectors: string): NodeListOf<Entity<any>>;
+        querySelector(selectors: 'a-scene'): Scene
+        querySelector(selectors: 'a-xyinput'): HTMLInputElement
+        querySelector(selectors: string): Entity<any>
+        querySelectorAll(selectors: string): NodeListOf<Entity<any>>
     }
 }

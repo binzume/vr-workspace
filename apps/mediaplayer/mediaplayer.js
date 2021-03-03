@@ -113,6 +113,12 @@ class ItemList extends BaseFileList {
 				for (let item of result.items) {
 					item.url = convUrl(item.url);
 					item.thumbnailUrl = convUrl(item.thumbnailUrl);
+					if (item.type == '') {
+						let m = item.name.match(/\.(\w+)$/);
+						if (m) {
+							item.type = 'application/' + m[1].toLowerCase();
+						}
+					}
 				}
 				this.offset = offset;
 				this.size = result.total || result.items.length;

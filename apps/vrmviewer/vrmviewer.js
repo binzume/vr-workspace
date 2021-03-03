@@ -1,4 +1,19 @@
-"use strict";
+// @ts-check
+'use strict';
+
+/**
+ * @param {ContentInfo} content 
+ */
+function bvhContentHandler(content) {
+	if (content.name.toLowerCase().endsWith('.bvh')) {
+		let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
+		if (activeModel) {
+			activeModel.setAttribute('vrm-bvh', 'src', content.url);
+			return true;
+		}
+	}
+	return false;
+};
 
 AFRAME.registerComponent('vrm-select', {
 	init() {
@@ -16,6 +31,10 @@ AFRAME.registerComponent('vrm-select', {
 					content.url = URL.createObjectURL(await (await content.fetch()).blob());
 				}
 				el.setAttribute('vrm', { src: content.url });
+			}
+			// Install .bvh handler
+			if (ev.detail.appManager && !ev.detail.appManager.contentHandlers.includes(bvhContentHandler)) {
+				ev.detail.appManager.contentHandlers.push(bvhContentHandler);
 			}
 		}, { once: true });
 
@@ -157,11 +176,17 @@ AFRAME.registerComponent('vrm-control-panel', {
 		if (!attrs) {
 			return;
 		}
+		// @ts-ignore
 		this._elByName('blink-toggle').value = attrs.blink;
+		// @ts-ignore
 		this._elByName('lookat-toggle').value = attrs.lookAt != null;
+		// @ts-ignore
 		this._elByName('physics-toggle').value = attrs.enablePhysics;
+		// @ts-ignore
 		this._elByName('first-person-toggle').value = attrs.firstPerson;
+		// @ts-ignore
 		this._elByName('pose-edit-toggle').value = vrmEl.hasAttribute('vrm-poser');
+		// @ts-ignore
 		this._elByName('skeleton-toggle').value = vrmEl.hasAttribute('vrm-skeleton');
 	},
 	_setAvatar(avatar) {
@@ -202,6 +227,6 @@ AFRAME.registerComponent('vrm-control-panel', {
 	 * @param {string} name 
 	 */
 	_elByName(name) {
-		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
+		return (this.el.querySelector("[name=" + name + "]"));
 	}
 });

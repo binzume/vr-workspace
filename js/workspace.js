@@ -1,4 +1,5 @@
 // @ts-check
+'use strict';
 
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /// <reference path="types.d.ts" />
@@ -10,8 +11,8 @@ class AppManager {
 	constructor() {
 		/** @type {AppInfo[]} */
 		this.apps = [];
-		/** @type {((c:ContentInfo) => boolean)[]} */
-		this.contentHandlers = [];
+		/** @type {((c:ContentInfo, options: object) => boolean)[]} */
+		this.contentHandlers = [this.defailtContentHandler.bind(this)];
 		/** @type {Set<string>} */
 		this.loadedModules = new Set();
 	}
@@ -75,7 +76,7 @@ class AppManager {
 			console.log('already exists:' + app.wid);
 			return null;
 		}
-		let el = await this.instantiate(app.url, app.type, sceneEl, app.wid);
+		let el = await this._instantiate(app.url, app.type, sceneEl, app.type == 'env' ? 'env' : app.wid);
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
@@ -115,30 +116,26 @@ class AppManager {
 	}
 
 	/**
-	 * @param {ContentInfo} contentInfo
+	 * @param {ContentInfo} content
+	 * @param {object} options
 	 */
-	openContent(contentInfo, options = {}) {
-		for (let handler of this.contentHandlers) {
-			if (handler(contentInfo)) {
-				return true;
-			}
-		}
-		let contentType = contentInfo.type.split(';')[0];
-		if (contentType == '') {
-			// TODO: remove this
-			let m = contentInfo.name.match(/\.(\w+)$/);
-			if (m) {
-				contentType = 'application/' + m[1].toLowerCase();
-			}
-		}
+	openContent(content, options = {}) {
+		return this.contentHandlers.some(handler => handler(content, options));
+	}
+
+	/**
+	 * @param {ContentInfo} content
+	 * @param {object} options
+	 */
+	defailtContentHandler(content, options) {
+		let contentType = content.type.split(';')[0];
 		let app =
 			this.apps.find(app => app.contentTypes && app.contentTypes.includes(contentType)) ||
 			this.apps.find(app => app.contentTypes && app.contentTypes.some(t =>
 				t.includes('*') && new RegExp(t.replace('*', '[^/]+')).test(contentType) // TODO: glob
 			));
 		if (app) {
-			options.content = contentInfo;
-			this.launch(app.id, null, options);
+			this.launch(app.id, null, Object.assign({ content: content }, options));
 			return true;
 		}
 		return false;
@@ -151,7 +148,7 @@ class AppManager {
 	 * @param {string} [instanceId]
 	 * @returns {Promise<AFRAME.AEntity>}
 	 */
-	async instantiate(url, apptype, parent, instanceId) {
+	async _instantiate(url, apptype, parent, instanceId) {
 		let [srcUrl, id] = url.split('#');
 		let base = new URL(location.href);
 		let srcSceneEl = null;
@@ -205,9 +202,8 @@ class AppManager {
 					}
 				}
 			}
-			let old = document.querySelector('#env');
+			let old = document.getElementById(instanceId);
 			old && old.parentNode.removeChild(old);
-			instanceId = 'env';
 		}
 
 		// TODO: document.importNode()
@@ -239,18 +235,6 @@ class AppManager {
 }
 
 globalThis.appManager = new AppManager();
-
-AFRAME.registerComponent('main-menu', {
-	schema: {},
-	init: function () {
-		this._elByName('exitVRButton').addEventListener('click', (ev) => {
-			this.el.sceneEl.exitVR();
-		});
-	},
-	_elByName(name) {
-		return this.el.querySelector("[name=" + name + "]");
-	}
-});
 
 AFRAME.registerComponent('apps-panel', {
 	schema: {},
@@ -304,7 +288,30 @@ AFRAME.registerComponent('apps-panel', {
 	 * @param {string} name 
 	 */
 	_elByName(name) {
-		return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
+		return this.el.querySelector("[name=" + name + "]");
+	}
+});
+
+AFRAME.registerComponent('main-menu', {
+	schema: {},
+	init: function () {
+		this._elByName('exitVRButton').addEventListener('click', (ev) => {
+			this.el.sceneEl.exitVR();
+		});
+	},
+	_elByName(name) {
+		return this.el.querySelector("[name=" + name + "]");
+	}
+});
+
+AFRAME.registerComponent('launch-on-click', {
+	schema: {
+		appid: { type: 'string', default: '' },
+	},
+	init() {
+		this.el.addEventListener('click', async (ev) => {
+			await appManager.launch(this.data.appid);
+		});
 	}
 });
 
@@ -330,7 +337,6 @@ AFRAME.registerComponent('search-box', {
 
 AFRAME.registerComponent('simple-clock', {
 	schema: {},
-	_intervalId: 0,
 	init() {
 		this._intervalId = setInterval(() => this.el.setAttribute('value', this._formatTime(new Date())), 1000);
 		this.el.setAttribute('value', this._formatTime(new Date()));
@@ -524,17 +530,6 @@ AFRAME.registerComponent('position-controls', {
 	}
 });
 
-AFRAME.registerComponent('launch-on-click', {
-	schema: {
-		appid: { type: 'string', default: '' },
-	},
-	init() {
-		this.el.addEventListener('click', async (ev) => {
-			await appManager.launch(this.data.appid);
-		});
-	}
-});
-
 AFRAME.registerComponent('window-locator', {
 	schema: {
 		applyCameraPos: { default: true },
@@ -553,8 +548,7 @@ AFRAME.registerComponent('window-locator', {
 	},
 	update(oldData) {
 		let el = this.el;
-		// @ts-ignore
-		let windows = el.sceneEl.systems.xywindow.windows;
+		let windowEls = Array.from(el.sceneEl.querySelectorAll('a-xywindow'));
 
 		let pos = this.el.object3D.position;
 		if (!oldData.applyCameraPos && this.data.applyCameraPos) {
@@ -574,7 +568,7 @@ AFRAME.registerComponent('window-locator', {
 		let dd = this.data.interval;
 		let d = el.object3D.getWorldDirection(new THREE.Vector3()).multiplyScalar(dd);
 		for (let i = 0; i < 16; i++) {
-			if (windows.every(window => window.el == el || window.el.object3D.position.distanceToSquared(pos) > dd * dd)) {
+			if (windowEls.every(windowEl => windowEl == el || windowEl.object3D.position.distanceToSquared(pos) > dd * dd)) {
 				break;
 			}
 			pos.add(d);
@@ -597,22 +591,6 @@ AFRAME.registerComponent('window-locator', {
 
 window.addEventListener('DOMContentLoaded', async (ev) => {
 	appManager.loadApps('#applications>a');
-	appManager.contentHandlers.push((item) => {
-		let ext = '';
-		let m = item.name.match(/\.(\w+)$/);
-		if (m) {
-			ext = m[1].toLowerCase();
-		}
-		// TODO: remove this.
-		if (['bvh'].includes(ext)) {
-			let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
-			if (activeModel) {
-				activeModel.setAttribute('vrm-bvh', 'src', item.url);
-				return true;
-			}
-		}
-		return false;
-	});
 
 	appManager.launch('main-menu', null, { disableWindowLocator: true });
 
