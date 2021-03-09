@@ -8,10 +8,13 @@ declare module "aframe" {
         keydown: KeyboardEvent
         keypress: KeyboardEvent
         thumbstickmoved: DetailEvent<{ x: number, y: number }>
+        object3dset: DetailEvent<{ object: any }>
         clickitem: DetailEvent<{ index: number }>
         change: DetailEvent<{ value: any, index?: number }>
         gesture: DetailEvent<{ name: string, center: any }>
-        'app-launch': DetailEvent<any>
+        xyviewport: DetailEvent<number[]>
+        'xy-drag': DetailEvent<{ raycaster: any, point: any, pointDelta: any }>
+        'app-launch': DetailEvent<{ appManager: AppManager, app: any, args: any, content: any }>
     }
 
     export interface Entity {

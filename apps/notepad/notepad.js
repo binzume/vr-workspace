@@ -3,6 +3,7 @@ AFRAME.registerComponent('notepad-app', {
     schema: {},
     init() {
         this.file = null;
+        this.appManager = null;
         let editorEl = this.el.querySelector('[texteditor]');
         editorEl.value = `# Example text
 Hello, world!
@@ -17,10 +18,16 @@ TODO:
 `;
 
         this._elByName('save-button').addEventListener('click', async (ev) => {
+            // @ts-ignore
+            let content = new Blob([editorEl.value], { type: 'text/plain' });
             if (this.file && this.file.update) {
                 console.log('save...');
-                await this.file.update(new Blob([editorEl.value], { type: 'text/plain' }));
+                await this.file.update(content);
                 console.log('saved');
+            } else if (this.appManager) {
+                let tmp = await this.appManager.newContent('text/plain', { extension: 'txt' });
+                await tmp.update(content);
+                console.log('saved', tmp.name);
             }
         });
         this._elByName('undo-button').addEventListener('click', (ev) => {

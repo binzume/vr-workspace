@@ -3,7 +3,7 @@
 /// <reference path="../node_modules/@types/aframe/index.d.ts" />
 /// <reference path="types.d.ts" />
 /** 
- * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?;}} ContentInfo
+ * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?; size: number?}} ContentInfo
  * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;contentTypes:string[]}} AppInfo
  */
 class AppManager {
@@ -120,6 +120,29 @@ class AppManager {
 	 */
 	openContent(content, options = {}) {
 		return this.contentHandlers.some(handler => handler(content, options));
+	}
+
+	/**
+	 * @param {string} contentType
+	 * @param {object} options
+	 * @returns {Promise<object>}
+	 */
+	async newContent(contentType, options = {}) {
+		// @ts-ignore
+		let storageList = globalThis.storageList;
+		// TODO: File select dialog.
+		let accessor = Object.values(storageList.accessors).find(a => a.writable && a.writeFile);
+		if (!accessor) {
+			return Promise.reject('no writable storage');
+		}
+		let name = (options.defaultName || 'untitled') + '.' + options.extension;
+		return Promise.resolve({
+			type: contentType,
+			name: name,
+			update(blob) {
+				return accessor.writeFile(name, blob);
+			}
+		});
 	}
 
 	/**
