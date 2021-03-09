@@ -87,7 +87,11 @@ class WebkitFileSystemWrapperFileList {
                 let file = await getFile(this._entry);
                 return start != null ? file.slice(start, end) : file;
             },
-            update(blob) { return storage.writeFile(this._entry.fullPath, blob); },
+            async update(blob) {
+                await storage.writeFile(this._entry.fullPath, blob);
+                this.size = blob.size;
+                return this;
+            },
             _entry: entry,
         }));
         this.size = this.items.length;
