@@ -79,7 +79,7 @@ AFRAME.registerComponent('kurage', {
 			let theta = i * 2 * Math.PI / narm;
 			geometries.push(armGeom.clone().translate(Math.sin(theta) * armr, -2, Math.cos(theta) * armr));
 		}
-		let main = new THREE.Mesh(this._mergeGeometry(geometries), this.bodyMat);
+		let main = new THREE.Mesh(this._mergeGeometry(geometries, true), this.bodyMat);
 		armGeom.dispose();
 		body.dispose();
 
@@ -98,29 +98,23 @@ AFRAME.registerComponent('kurage', {
 		geometry.setAttribute(name, new THREE.BufferAttribute(array, value.length));
 	},
 	/**
-	 * @param {THREE.BufferGeometry[]} gg
+	 * @param {THREE.BufferGeometry[]} geometries
 	 */
-	_mergeGeometry(gg) {
+	_mergeGeometry(geometries, dispose = false) {
 		let dst = new THREE.BufferGeometry();
-		let sz = gg.reduce((acc, g) => acc + g.getAttribute('position').count, 0);
+		let sz = geometries.reduce((acc, g) => acc + g.getAttribute('position').count, 0);
 		if (sz == 0) {
 			return dst;
 		}
-		for (let name of Object.keys(gg[0].attributes)) {
-			let attr = gg[0].attributes[name];
+		for (let [name, attr] of Object.entries(geometries[0].attributes)) {
 			let t = attr.array.constructor;
 			// @ts-ignore
 			dst.setAttribute(name, new THREE.BufferAttribute(new t(sz * attr.itemSize), attr.itemSize));
 		}
-		let p = 0;
-		for (let g of gg) {
-			dst.merge(g, p);
-			p += g.getAttribute('position').count;
-		}
-		if (gg[0].index) {
+		if (geometries[0].index) {
 			let index = [];
 			let offset = 0;
-			for (let g of gg) {
+			for (let g of geometries) {
 				// @ts-ignore
 				for (let i of g.index.array) {
 					index.push(i + offset);
@@ -128,6 +122,12 @@ AFRAME.registerComponent('kurage', {
 				offset += g.getAttribute('position').count;
 			}
 			dst.setIndex(index);
+		}
+		let p = 0;
+		for (let g of geometries) {
+			dst.merge(g, p);
+			p += g.getAttribute('position').count;
+			dispose && g.dispose();
 		}
 		return dst;
 	},
