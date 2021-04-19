@@ -38,43 +38,37 @@ class FileListCursor {
 // @ts-ignore
 let storageList = globalThis.storageList;
 
-AFRAME.registerComponent('media-selector', {
+
+AFRAME.registerComponent('xylist-grid-layout', {
+	dependencies: ['xyrect', 'xylist'],
 	schema: {
-		storage: { default: "" },
-		path: { default: "" },
-		sortField: { default: "" },
-		sortOrder: { default: "" },
-		openWindow: { default: false }
+		itemWidth: { default: 1.5 },
+		itemHeight: { default: 1.5 },
 	},
 	init() {
-		this.itemlist = storageList;
-		this.item = {};
-		this.appManager = null;
-		let videolist = this._byName('medialist').components.xylist;
-		let itemWidth = 4.0;
-		let itemHeight = 1.0;
+		this.update = this.update.bind(this);
+		this.update();
+		this.el.addEventListener('xyresize', this.update);
+	},
+	update() {
+		let data = this.data;
+		let xylist = this.el.components.xylist;
+		let xyrect = this.el.components.xyrect;
+		let width = xyrect.width || 6.0;
+
 		let cols = 1;
-		let thumbW = 200, thumbH = 128;
-		let windowWidth = this.el.getAttribute('width');
-		let gridMode = false;
-		this.el.addEventListener('app-launch', (ev) => {
-			this.appManager = ev.detail.appManager;
-			if (ev.detail.args) {
-				// TODO: parse args
-				let p = ev.detail.args.split(/\/(.*)/);
-				if (p.length >= 2) {
-					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updated', sortOrder: 'd' });
-				}
-			}
-		}, { once: true });
-		if (windowWidth >= 4) {
-			gridMode = true;
-			cols = Math.floor(windowWidth / 1.5);
-			itemHeight = itemWidth = windowWidth / cols;
-			thumbW = 256 - 4;
-			thumbH = 160;
+		let itemWidth = width;
+		let itemHeight = data.itemHeight;
+		if (width >= data.itemWidth * 2) {
+			cols = Math.floor(width / data.itemWidth);
+			itemWidth = width / cols;
+			itemHeight = data.itemHeight * itemWidth / data.itemWidth;
 		}
-		videolist.setLayout({
+		this.cols = cols;
+		this.itemWidth = itemWidth;
+		this.itemHeight = itemHeight;
+
+		xylist.setLayout({
 			size(itemCount) {
 				return { width: itemWidth * cols, height: itemHeight * Math.ceil(itemCount / cols) };
 			},
@@ -89,18 +83,48 @@ AFRAME.registerComponent('media-selector', {
 				let x = (position % cols) * itemWidth, y = - Math.floor(position / cols) * itemHeight;
 				let xyrect = el.components.xyrect;
 				let pivot = xyrect ? xyrect.data.pivot : { x: 0.5, y: 0.5 };
-				el.setAttribute("position", { x: x + pivot.x * xyrect.width, y: y - pivot.y * xyrect.height, z: 0 });
+				el.setAttribute("xyrect", { width: itemWidth, height: itemHeight });
+				el.setAttribute("position", { x: x + pivot.x * itemWidth, y: y - pivot.y * itemHeight, z: 0 });
 			}
 		});
+	}
+});
+
+
+AFRAME.registerComponent('media-selector', {
+	schema: {
+		storage: { default: "" },
+		path: { default: "" },
+		sortField: { default: "" },
+		sortOrder: { default: "" },
+		openWindow: { default: false }
+	},
+	init() {
+		this.itemlist = storageList;
+		this.item = {};
+		this.appManager = null;
+		let videolist = this._byName('medialist').components.xylist;
+		let grid = this._byName('medialist').components['xylist-grid-layout'];
+
+		this.el.addEventListener('app-launch', (ev) => {
+			this.appManager = ev.detail.appManager;
+			if (ev.detail.args) {
+				// TODO: parse args
+				let p = ev.detail.args.split(/\/(.*)/);
+				if (p.length >= 2) {
+					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updated', sortOrder: 'd' });
+				}
+			}
+		}, { once: true });
+
 		videolist.setAdapter({
 			selector: this,
 			create(parent) {
 				//console.log("create elem");
 				var el = document.createElement('a-plane');
-				el.setAttribute("width", itemWidth);
-				el.setAttribute("height", itemHeight);
-				el.setAttribute("xyrect", {});
-				if (gridMode) {
+				el.setAttribute("width", grid.itemWidth);
+				el.setAttribute("height", grid.itemHeight);
+				if (grid.cols > 1) {
 					el.setAttribute("xycanvas", { width: 256, height: 256 });
 				} else {
 					el.setAttribute("xycanvas", { width: 512, height: 128 });
@@ -135,7 +159,12 @@ AFRAME.registerComponent('media-selector', {
 						videolist.setContents(this.selector.itemlist, this.selector.itemlist.size); // update size
 					}
 
-					if (gridMode) {
+					let thumbW = 200, thumbH = 128;
+					if (grid.cols > 1) {
+						thumbW = 256 - 4;
+						thumbH = 160;
+					}
+					if (grid.cols > 1) {
 						ctx.font = "20px bold sans-serif";
 						ctx.fillStyle = "white";
 						let n = wrapText(item.name, 250, ctx);
@@ -166,8 +195,8 @@ AFRAME.registerComponent('media-selector', {
 						if (el.dataset.listPosition != position) {
 							return;
 						}
-						let py = gridMode ? 2 : 24;
-						let px = gridMode ? 2 : 0;
+						let py = grid.cols > 1 ? 2 : 24;
+						let px = grid.cols > 1 ? 2 : 0;
 						let dw = thumbW, dh = thumbH - py;
 						let sx = 0, sy = 0, sw = image.width, sh = image.height;
 						if (sh / sw > dh / dw) {
@@ -317,6 +346,8 @@ AFRAME.registerComponent('media-player', {
 		this.loadingTimer = null;
 		this.screen = this.el.querySelector(this.data.screen);
 		this.touchToPlay = false;
+		this.width = 0;
+		this.height = 0;
 		// @ts-ignore
 		this.system.registerPlayer(this);
 
@@ -341,6 +372,15 @@ AFRAME.registerComponent('media-player', {
 		showControls(false);
 		this.el.addEventListener('mouseenter', ev => { showControls(true); setTimeout(() => showControls(true), 0) });
 		this.el.addEventListener('mouseleave', ev => showControls(false));
+		this.el.addEventListener('xyresize', ev => {
+			let r = ev.detail.xyrect;
+			if (r.width != this.width || r.height != this.height) {
+				if (this.mediaEl) {
+					this.el.setAttribute('media-player', { maxWidth: r.width, maxHeight: r.height });
+					this.resize(this.mediaEl.naturalWidth || this.mediaEl.videoWidth, this.mediaEl.naturalHeight || this.mediaEl.videoHeight);
+				}
+			}
+		});
 	},
 	update(oldData) {
 		if (this.data.src != oldData.src && this.data.src) {
@@ -366,10 +406,13 @@ AFRAME.registerComponent('media-player', {
 			w = 10;
 		}
 
+		this.width = w;
+		this.height = h;
 		this.screen.setAttribute("width", w);
 		this.screen.setAttribute("height", h);
-		this.el.setAttribute("width", w);
-		this.el.setAttribute("height", h);
+		setTimeout(() => {
+			this.el.setAttribute("xyrect", { width: w, height: h });
+		}, 0);
 	},
 	playContent(f, listCursor) {
 		this.listCursor = listCursor;
@@ -415,6 +458,7 @@ AFRAME.registerComponent('media-player', {
 		parent.appendChild(dataElem);
 		this.mediaEl = dataElem;
 
+		// @ts-ignore
 		if (!f.url && f.type.startsWith("video/mp4") && typeof MP4Player !== 'undefined') {
 			let options = {
 				opener: {
@@ -423,6 +467,7 @@ AFRAME.registerComponent('media-player', {
 					}
 				}
 			};
+			// @ts-ignore
 			new MP4Player(dataElem).setBufferedReader(new BufferedReader(options));
 		} else if (!f.url && f.fetch) {
 			(async () => {
