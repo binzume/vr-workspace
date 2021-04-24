@@ -52,15 +52,15 @@
       </a-entity>
     </a-xywindow>
 
-    <a-xywindow id="media-selector-template" media-selector xywindow="background:true" position="-1.5 0.5 -2" scale="0.2 0.2 0.2" title="Media" width="6" height="6.3" xycontainer="direction:column;justifyItems:stretch;alignItems:stretch;">
-      <a-xycontainer width="6" height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05" xyitem="grow:0;shrink:0">
+    <a-xywindow id="media-selector-template" media-selector xywindow="background:true" position="-1.2 0.3 -1.5" scale="0.15 0.15 0.15" title="Storage" width="6" height="6.5" xycontainer="direction:column;justifyItems:stretch;alignItems:stretch;">
+      <a-xycontainer width="6" height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05" xyitem="grow:0;shrink:0">
         <a-xybutton name="storage-button" label="/" width="0.5"></a-xybutton>
         <a-xybutton name="parent-button" label="[..]" width="0.4"></a-xybutton>
         <a-xyselect name="sort-option" label="sort" width="0.5" height="0.4" values=""></a-xyselect>
-        <a-xyselect name="option-menu" label="..." width="0.2" values="NewWindow,+Fav,-Fav"></a-xybutton>
+        <a-xyselect name="option-menu" label="..." width="0.2" values="NewWindow,+Fav,-Fav"></a-xyselect>
       </a-xycontainer>
       <a-xyscroll width=6 height=6>
-        <a-entity name="medialist" xylist xyrect xylist-grid-layout></a-entity>
+        <a-entity name="medialist" xylist-grid-layout="itemWidth:1.5; itemHeight:1.5"></a-entity>
       </a-xyscroll>
     </a-xywindow>
 

@@ -44,29 +44,28 @@ AFRAME.registerComponent('xylist-grid-layout', {
 	schema: {
 		itemWidth: { default: 1.5 },
 		itemHeight: { default: 1.5 },
+		stretch: { default: true },
 	},
 	init() {
 		this.update = this.update.bind(this);
-		this.update();
 		this.el.addEventListener('xyresize', this.update);
 	},
 	update() {
 		let data = this.data;
 		let xylist = this.el.components.xylist;
 		let xyrect = this.el.components.xyrect;
-		let width = xyrect.width || 6.0;
-
-		let cols = 1;
-		let itemWidth = width;
-		let itemHeight = data.itemHeight;
-		if (width >= data.itemWidth * 2) {
-			cols = Math.floor(width / data.itemWidth);
-			itemWidth = width / cols;
-			itemHeight = data.itemHeight * itemWidth / data.itemWidth;
+		let containerWidth = xyrect.width;
+		if (containerWidth <= 0) {
+			containerWidth = this.el.parentElement.getAttribute("width");
 		}
-		this.cols = cols;
-		this.itemWidth = itemWidth;
-		this.itemHeight = itemHeight;
+
+		let itemWidth = data.itemWidth;
+		let itemHeight = data.itemHeight;
+		let cols = Math.max(containerWidth / itemWidth | 0, 1);
+		if (data.stretch) {
+			itemWidth = containerWidth / cols;
+			itemHeight *= itemWidth / data.itemWidth;
+		}
 
 		xylist.setLayout({
 			size(itemCount) {
@@ -80,10 +79,9 @@ AFRAME.registerComponent('xylist-grid-layout', {
 				}
 			},
 			layout(el, position) {
-				let x = (position % cols) * itemWidth, y = - Math.floor(position / cols) * itemHeight;
-				let xyrect = el.components.xyrect;
-				let pivot = xyrect ? xyrect.data.pivot : { x: 0.5, y: 0.5 };
 				el.setAttribute("xyrect", { width: itemWidth, height: itemHeight });
+				let x = (position % cols) * itemWidth, y = - (position / cols | 0) * itemHeight;
+				let pivot = el.components.xyrect.data.pivot;
 				el.setAttribute("position", { x: x + pivot.x * itemWidth, y: y - pivot.y * itemHeight, z: 0 });
 			}
 		});
@@ -122,17 +120,20 @@ AFRAME.registerComponent('media-selector', {
 			create(parent) {
 				//console.log("create elem");
 				var el = document.createElement('a-plane');
-				el.setAttribute("width", grid.itemWidth);
-				el.setAttribute("height", grid.itemHeight);
-				if (grid.cols > 1) {
+				let squareMode = grid.data.itemHeight / grid.data.itemWidth > 0.9;
+				if (squareMode) {
 					el.setAttribute("xycanvas", { width: 256, height: 256 });
 				} else {
 					el.setAttribute("xycanvas", { width: 512, height: 128 });
 				}
 				return el;
 			}, bind(position, el, data) {
+				let rect = el.components.xyrect;
 				let canvas = el.components.xycanvas.canvas;
 				let ctx = el.components.xycanvas.canvas.getContext("2d");
+				let squareMode = rect.height / rect.width > 0.9;
+				el.setAttribute("width", rect.width * 0.99);
+				el.setAttribute("height", rect.height * 0.99);
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				el.components.xycanvas.updateTexture();
 
@@ -160,11 +161,11 @@ AFRAME.registerComponent('media-selector', {
 					}
 
 					let thumbW = 200, thumbH = 128;
-					if (grid.cols > 1) {
+					if (squareMode) {
 						thumbW = 256 - 4;
 						thumbH = 160;
 					}
-					if (grid.cols > 1) {
+					if (squareMode) {
 						ctx.font = "20px bold sans-serif";
 						ctx.fillStyle = "white";
 						let n = wrapText(item.name, 250, ctx);
@@ -195,8 +196,8 @@ AFRAME.registerComponent('media-selector', {
 						if (el.dataset.listPosition != position) {
 							return;
 						}
-						let py = grid.cols > 1 ? 2 : 24;
-						let px = grid.cols > 1 ? 2 : 0;
+						let py = squareMode ? 2 : 24;
+						let px = squareMode ? 2 : 0;
 						let dw = thumbW, dh = thumbH - py;
 						let sx = 0, sy = 0, sw = image.width, sh = image.height;
 						if (sh / sw > dh / dw) {
