@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Paint3D</title>
+  <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
+  <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="paint3d.js"></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene>
+    <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
+
+    <a-xywindow id="app" paint3d scale='0.15 0.15 0.15' title="Palette" width="4" height="2" position="0 1 -1" xywindow="background:true">
+      <a-xycontainer direction="horizontal" width="4" height="2" wrap="wrap">
+
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#0000ff"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#ff0000"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#ff00ff"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#00ff00"></a-xybutton>
+
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#00ffff"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#ffff00"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#ffffff"></a-xybutton>
+        <a-xybutton class='paint3d-color' label="" width="0.5" color="#000000"></a-xybutton>
+
+        <a-xybutton class='paint3d-size' label="1" width="0.5"></a-xybutton>
+        <a-xybutton class='paint3d-size' label="2" width="0.5"></a-xybutton>
+        <a-xybutton class='paint3d-size' label="3" width="0.5"></a-xybutton>
+        <a-xybutton class='paint3d-size' label="4" width="0.5"></a-xybutton>
+
+        <a-xybutton name='undo-button' label="Undo" width="2"></a-xybutton>
+        <a-xybutton name='clear-button' label="Clear" width="2"></a-xybutton>
+      </a-xycontainer>
+    </a-xywindow>
+
+    <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
