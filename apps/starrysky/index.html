@@ -17,10 +17,10 @@
     <a-entity id="env">
       <a-entity celestial-sphere="src:https://binzume.github.io/webvr-skymap/data/hip_stars.json?;updateIntervalMs:100;speed:1"></a-entity>
       <a-plane id='ground' wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='-90 0 0' color="#111144"></a-plane>
-      <a-xylabel value="S" width="0.6" height="1" wrap-count="1.5" position='0 0.01 -2' rotation='-90 0 180'  color="#444444"></a-xylabel>
-      <a-xylabel value="N" width="0.6" height="1" wrap-count="1.5" position='0 0.01 2' rotation='-90 0 0' color="#441111"></a-xylabel>
-      <a-xylabel value="W" width="0.6" height="1" wrap-count="1.5" position='-2 0.01 0' rotation='-90 0 90' color="#444444"></a-xylabel>
-      <a-xylabel value="E" width="0.6" height="1" wrap-count="1.5" position='2 0.01 0' rotation='-90 0 -90' color="#444444"></a-xylabel>
+      <a-xylabel value="S" width="0.6" height="1" wrap-count="1.5" align="center" position='0 0.01 -2' rotation='-90 0 0'  color="#444444"></a-xylabel>
+      <a-xylabel value="N" width="0.6" height="1" wrap-count="1.5" align="center" position='0 0.01 2' rotation='-90 0 180' color="#441111"></a-xylabel>
+      <a-xylabel value="W" width="0.6" height="1" wrap-count="1.5" align="center" position='-2 0.01 0' rotation='-90 0 90' color="#444444"></a-xylabel>
+      <a-xylabel value="E" width="0.6" height="1" wrap-count="1.5" align="center" position='2 0.01 0' rotation='-90 0 -90' color="#444444"></a-xylabel>
     </a-entity>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;axismove:rotation" >
