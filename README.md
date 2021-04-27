@@ -2,7 +2,7 @@
 
 WebVR/WebXRで色々試すための環境です．
 
-## Usage
+## Demo
 
 https://binzume.github.io/vr-workspace/
 
@@ -25,6 +25,7 @@ OculusQuest等で上記URLにアクセスして `VR` ボタンをクリックし
 - Calculator
 - Notepad
 - Console
+- Paint3D
 - Media Player
 - Storage
   - Google Drive client
