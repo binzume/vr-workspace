@@ -1,10 +1,11 @@
+'use strict';
 
 AFRAME.registerComponent('notepad-app', {
     schema: {},
     init() {
         this.file = null;
         this.appManager = null;
-        let editorEl = this.el.querySelector('[texteditor]');
+        let editorEl = /** @type {AFRAME.AEntity & {value: string}} */ (this.el.querySelector('[texteditor]'));
         editorEl.value = `# Example text
 Hello, world!
 
@@ -18,7 +19,6 @@ TODO:
 `;
 
         this._elByName('save-button').addEventListener('click', async (ev) => {
-            // @ts-ignore
             let content = new Blob([editorEl.value], { type: 'text/plain' });
             if (this.file && this.file.update) {
                 console.log('save...');
@@ -58,7 +58,7 @@ TODO:
         }, { once: true });
     },
     _elByName(name) {
-        return /** @type {import("aframe").Entity} */ (this.el.querySelector("[name=" + name + "]"));
+        return this.el.querySelector("[name=" + name + "]");
     },
     remove() {
         this.file = null;

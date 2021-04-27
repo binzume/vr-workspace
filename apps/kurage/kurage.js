@@ -1,11 +1,10 @@
-// @ts-check
+'use strict';
 
 AFRAME.registerComponent('kurage', {
 	schema: {
 	},
 	init() {
 		this.offset = Math.random() * 100;
-
 
 		let vs = /* glsl */`
 		uniform float time;
@@ -93,8 +92,7 @@ AFRAME.registerComponent('kurage', {
 	 * @param {number[]} value 
 	 */
 	_fillAttr(geometry, name, value) {
-		// @ts-ignore
-		let array = new Float32Array(new Array(geometry.getAttribute('position').count).fill(value).flat())
+		let array = new Float32Array(new Array(geometry.getAttribute('position').count).fill(value).flat());
 		geometry.setAttribute(name, new THREE.BufferAttribute(array, value.length));
 	},
 	/**
@@ -107,9 +105,8 @@ AFRAME.registerComponent('kurage', {
 			return dst;
 		}
 		for (let [name, attr] of Object.entries(geometries[0].attributes)) {
-			let t = attr.array.constructor;
-			// @ts-ignore
-			dst.setAttribute(name, new THREE.BufferAttribute(new t(sz * attr.itemSize), attr.itemSize));
+			let typedArray = /** @type {new (size: number) => ArrayLike<number>} */ (attr.array.constructor);
+			dst.setAttribute(name, new THREE.BufferAttribute(new typedArray(sz * attr.itemSize), attr.itemSize));
 		}
 		if (geometries[0].index) {
 			let index = [];
