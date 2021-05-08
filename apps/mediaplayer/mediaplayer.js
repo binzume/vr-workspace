@@ -56,7 +56,7 @@ AFRAME.registerComponent('xylist-grid-layout', {
 		let xyrect = this.el.components.xyrect;
 		let containerWidth = xyrect.width;
 		if (containerWidth <= 0) {
-			containerWidth = this.el.parentElement.getAttribute("width");
+			containerWidth = +this.el.parentElement.getAttribute("width");
 		}
 
 		let itemWidth = data.itemWidth;
@@ -85,6 +85,7 @@ AFRAME.registerComponent('xylist-grid-layout', {
 				el.setAttribute("position", { x: x + pivot.x * itemWidth, y: y - pivot.y * itemHeight, z: 0 });
 			}
 		});
+		xylist.setViewport([0, 0, 0, 0]);
 	}
 });
 
@@ -114,6 +115,10 @@ AFRAME.registerComponent('media-selector', {
 				}
 			}
 		}, { once: true });
+
+		this.el.addEventListener('xyresize', ev => {
+			this._byName('medialist').setAttribute('xyrect', { width: ev.detail.xyrect.width });
+		});
 
 		videolist.setAdapter({
 			selector: this,
@@ -339,8 +344,8 @@ AFRAME.registerComponent('media-player', {
 		playbackRate: { default: 1.0 },
 		loadingSrc: { default: "#mediaplayer-loading" },
 		mediaController: { default: "media-controller" },
-		maxWidth: { default: 25 },
-		maxHeight: { default: 25 },
+		maxWidth: { default: 16 },
+		maxHeight: { default: 16 },
 		screen: { default: ".screen" }
 	},
 	init() {

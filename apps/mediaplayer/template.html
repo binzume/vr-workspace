@@ -19,31 +19,31 @@
       <img id="mediaplayer-loading" src="images/loading.png" />
     </a-assets>
 
-    <a-xywindow id="media-player-template" media-player xyresize="minWidth:10" scale='0.2 0.2 0.2' width="10" height="6" position="0 1.5 -6" xy-drag-control="draggable:.screen;autoRotate:true" xycontainer="direction:column">
+    <a-xywindow id="media-player-template" media-player xyresize="minWidth:10" scale='0.2 0.2 0.2' width="10" height="6" position="0 1 -4" xy-drag-control="draggable:.screen;autoRotate:true" xycontainer="direction:column">
       <a-video class="screen" width="10" height="6" src="#mediaplayer-loading" material="npot:true;shader: flat;"></a-video>
-      <a-entity xyrect>
-      <a-xycontainer direction="column" media-controller width="9" height="2.2" position="0 1.5 0.05">
-        <a-entity xyitem="fixed:true" geometry="primitive:xy-rounded-rect;width:9;height:2.2" position="0 0 -0.02" material="color:#444; opacity:0.8"></a-entity>
-        <a-xyrange name="seek" width="9" height="0.4"></a-xyrange>
-        <a-xycontainer direction="row" width="6" height="1" spacing="0.2" justify-items="space-between">
-          <a-xybutton name="prev" width="1" height="0.8">
-            <a-plane width="0.7" height="0.7" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:3"></a-plane>
+      <a-entity xyrect="height:0">
+      <a-xycontainer direction="column" media-controller width="8" height="2" position="0 1.1 0.05">
+        <a-entity xyitem="fixed:true" geometry="primitive:xy-rounded-rect;width:8;height:2" position="0 0 -0.02" material="color:#444; opacity:0.8"></a-entity>
+        <a-xyrange name="seek" width="8" height="0.4"></a-xyrange>
+        <a-xycontainer direction="row" width="5" height="0.8" spacing="0.2" justify-items="space-between">
+          <a-xybutton name="prev" width="0.8" height="0.6">
+            <a-plane width="0.5" height="0.5" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:3"></a-plane>
           </a-xybutton>
-          <a-xybutton name="bak10s" width="1" height="0.8">
-            <a-plane width="0.7" height="0.7" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:4"></a-plane>
+          <a-xybutton name="bak10s" width="0.8" height="0.6">
+            <a-plane width="0.5" height="0.5" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:4"></a-plane>
           </a-xybutton>
-          <a-xybutton name="playpause" width="1" height="1">
-            <a-plane width="0.9" height="0.9" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:0"></a-plane>
+          <a-xybutton name="playpause" width="0.8" height="0.8">
+            <a-plane width="0.7" height="0.7" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:0"></a-plane>
           </a-xybutton>
-          <a-xybutton name="fwd10s" width="1" height="0.8">
-            <a-plane width="0.7" height="0.7" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:5"></a-plane>
+          <a-xybutton name="fwd10s" width="0.8" height="0.6">
+            <a-plane width="0.5" height="0.5" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:5"></a-plane>
           </a-xybutton>
-          <a-xybutton name="next" width="1" height="0.8">
-            <a-plane width="0.7" height="0.7" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:2"></a-plane>
+          <a-xybutton name="next" width="0.8" height="0.6">
+            <a-plane width="0.5" height="0.5" position="0 0 0.02" atlas="src:#mediaplayer-icons; cols:2; rows: 4; index:2"></a-plane>
           </a-xybutton>
         </a-xycontainer>
         <a-xycontainer direction="row" width="8" height="0.6" spacing="0.1" justify-items="end">
-          <a-xyrange name="playbackRate" min="0.2" max="3" step="0.2" value="1" width="3" height="0.4"></a-xyrange>
+          <a-xyrange name="playbackRate" min="0.2" max="3" step="0.2" value="1" width="2.5" height="0.4"></a-xyrange>
           <a-xylabel name="playbackRateText" width="0.6" height="0.4" wrap-count="3" value="1.0"></a-xylabel>
           <a-xyselect name="loopmode" width="1" height="0.6" toggle="true" select="1" values="L-OFF,L-1,&gt;-&gt;"></a-xyselect>
           <a-xyselect name="stereomode" width="1" height="0.6" label="3D"  values="2D,LR,TB,360,3D360,CubeMap"></a-xyselect>
