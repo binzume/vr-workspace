@@ -13,6 +13,7 @@ export class BaseFileList {
         this.options = options || {};
         this.size = -1;
         this.name = "";
+        /** @type {string} */
         this.thumbnailUrl = null;
         this.onupdate = null;
     }
@@ -30,6 +31,7 @@ export class BaseFileList {
     async get(position) {
         throw 'not implemented';
     }
+
     notifyUpdate() {
         if (this.onupdate) {
             this.onupdate();
@@ -45,27 +47,46 @@ class ItemList extends BaseFileList {
      */
     constructor(apiUrl, itemPath, options) {
         super(itemPath, options);
-        this.thumbnailUrl = null;
-        this.offset = 0;
         this.apiUrl = apiUrl;
-        this.loadPromise = null;
-        this.items = [];
+        this.name = itemPath;
+        this._pageSize = 20;
+        /** @type {Map<number, [page: any] | [Promise, AbortController]>} */
+        this._pageCache = new Map();
+        this._pageCacheMax = 10;
     }
     init() {
         return this._load(0);
     }
+    /**
+     * @param {number} position
+     */
     async get(position) {
+        if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
         let item = this._getOrNull(position);
         if (item != null) {
             return item;
         }
-        if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
-        await this._load(Math.max(position - 10, 0));
-        return this._getOrNull(position);
+        let result = await this._load(position / this._pageSize | 0);
+        return result && result[position % this._pageSize];
     }
-    async _load(offset) {
-        if (this.loadPromise !== null) return await this.loadPromise;
+    /**
+     * @param {number} page
+     */
+    async _load(page) {
+        let cache = this._pageCache.get(page);
+        if (cache != null) {
+            return (cache.length == 2) ? await cache[0] : cache[0];
+        }
+        for (const [p, c] of this._pageCache) {
+            if (this._pageCache.size < this._pageCacheMax) {
+                break;
+            }
+            console.log("invalidate: " + p, c[1] != null);
+            this._pageCache.delete(p);
+            c[1] != null && c[1].abort();
+        }
 
+        let offset = page * this._pageSize;
         let baseUrl = (this.apiUrl + this.itemPath).replace(/[^/]+$/, '');
         let convUrl = (path) => {
             if (path == null || path.includes('://')) return path;
@@ -75,42 +96,57 @@ class ItemList extends BaseFileList {
             return path;
         };
 
-        this.loadPromise = (async () => {
-            let params = "?offset=" + offset;
+        let ac = new AbortController();
+        let task = (async (signal) => {
+            await new Promise((resolve) => setTimeout(resolve, this._pageCache.size));
+            console.log("fetch page:", page, signal.aborted);
+            let params = "?offset=" + offset + "&limit=" + this._pageSize;
             if (this.options.orderBy) params += "&orderBy=" + this.options.orderBy;
             if (this.options.order) params += "&order=" + this.options.order;
-            let response = await fetch(this.apiUrl + this.itemPath + params);
-            if (response.ok) {
-                let result = await response.json();
-                for (let item of result.items) {
-                    item.url = convUrl(item.url);
-                    item.thumbnailUrl = convUrl(item.thumbnailUrl);
-                    if (item.type == '') {
-                        let m = item.name.match(/\.(\w+)$/);
-                        if (m) {
-                            item.type = 'application/' + m[1].toLowerCase();
-                        }
+            let response = await fetch(this.apiUrl + this.itemPath + params, { signal: signal });
+            if (!response.ok) {
+                throw "fetch error";
+            }
+            let result = await response.json();
+            for (let item of result.items) {
+                item.url = convUrl(item.url);
+                item.thumbnailUrl = convUrl(item.thumbnailUrl);
+                if (item.type == '') {
+                    let m = item.name.match(/\.(\w+)$/);
+                    if (m) {
+                        item.type = 'application/' + m[1].toLowerCase();
                     }
                 }
-                this.offset = offset;
-                this.size = result.total || result.items.length;
-                this.items = result.items;
-                this.name = result.name || this.itemPath;
-                if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
             }
-        })();
+            this.size = result.total || (offset + result.items.length);
+            this.name = result.name || this.itemPath;
+
+            if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
+            return result.items;
+        })(ac.signal);
         try {
-            await this.loadPromise;
-        } finally {
-            this.loadPromise = null;
+            this._pageCache.set(page, [task, ac]);
+            let result = await task;
+            if (this._pageCache.has(page)) {
+                this._pageCache.set(page, [result]);
+            }
+            return result;
+        } catch (e) {
+            this._pageCache.delete(page);
         }
     }
     getParentPath() {
         return this.itemPath.replace(/\/[^/]+$/, '');
     }
     _getOrNull(position) {
-        if (position < this.offset || position >= this.offset + this.items.length) return null;
-        return this.items[position - this.offset];
+        let page = position / this._pageSize | 0;
+        let cache = this._pageCache.get(page);
+        if (cache) {
+            this._pageCache.delete(page);
+            this._pageCache.set(page, cache);
+            return cache[0][position - this._pageSize * page];
+        }
+        return null;
     }
 }
 
