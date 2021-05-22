@@ -617,6 +617,9 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 	appManager.launch('main-menu', null, { disableWindowLocator: true });
 
 	let sceneEl = document.querySelector('a-scene');
+	if (window.isSecureContext && sceneEl.components['device-orientation-permission-ui']) {
+		sceneEl.components['device-orientation-permission-ui'].showHTTPAlert = () => {};
+	}
 
 	// gesture
 	sceneEl.addEventListener('gesture', async (ev) => {
@@ -637,9 +640,10 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 				let cameraPosition = new THREE.Vector3();
 				let cameraQuaternion = new THREE.Quaternion();
 				let tmp = new THREE.Vector3();
-				tr.decompose(cameraPosition, cameraQuaternion, tmp);
+
+				camera.matrixWorld.decompose(cameraPosition, cameraQuaternion, tmp);
 				tr.lookAt(cameraPosition, pos, tmp.set(0, 1, 0));
-				targetObj.setRotationFromQuaternion(cameraQuaternion);
+				targetObj.setRotationFromMatrix(tr);
 			}
 		}
 		if (document.activeElement && document.activeElement != document.body) {
