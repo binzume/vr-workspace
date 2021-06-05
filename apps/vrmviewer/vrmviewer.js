@@ -5,14 +5,13 @@
  * @param {ContentInfo} content 
  */
 function bvhContentHandler(content) {
-	if (content.name.toLowerCase().endsWith('.bvh')) {
+	if (content.name.toLowerCase().endsWith('.bvh') || content.name.toLowerCase().endsWith('.vmd')) {
 		let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
 		if (activeModel) {
 			activeModel.setAttribute('vrm-bvh', 'src', content.url);
 			return true;
 		}
 	}
-	return false;
 };
 
 AFRAME.registerComponent('vrm-select', {
