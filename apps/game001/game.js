@@ -1,89 +1,83 @@
+// @ts-check
+'use strict';
 
 class OctreeNode {
+    /**
+     * @param {number} depth 
+     * @param {any} value 
+     */
     constructor(depth, value) {
         this.value = value;
+        /** @type {OctreeNode[]} */
         this.children = null;
         this.depth = depth;
-        this.size = 1 << depth;
-    }
-
-    makeChildren() {
-        if (this.children != null) return;
-        var c = new Array(8);
-        this.children = c;
-        for (var i = 0; i < 8; i++) {
-            c[i] = new OctreeNode(this.depth - 1, this.value);
-        }
-        return this;
     }
 
     get(x, y, z) {
-        if (this.children == null) return this.value;
-        var d = this.depth - 1;
-        var n = ((x >> d) & 1) + ((y >> d) & 1) * 2 + ((z >> d) & 1) * 4;
+        if (this.children === null) return this.value;
+        let d = this.depth - 1;
+        let n = ((x >> d) & 1) + ((y >> d) & 1) * 2 + ((z >> d) & 1) * 4;
         return this.children[n].get(x, y, z);
     }
 
     set(x, y, z, v) {
-        var d = this.depth - 1;
+        let d = this.depth - 1;
         if (d < 0) {
             this.value = v;
             return true; // changed.
         }
-        if (this.children == null) {
+        if (this.children === null) {
             if (this.value == v) return false;
-            this.makeChildren();
+            this._makeChildren();
         }
 
-        var n = ((x >> d) & 1) + ((y >> d) & 1) * 2 + ((z >> d) & 1) * 4;
-        if (!this.children[n].set(x, y, z, v)) return false;
-        for (var i = 0; i < 8; i++) {
-            if (this.children[i].children != null || this.children[i].value != v) return false;
+        let n = ((x >> d) & 1) + ((y >> d) & 1) * 2 + ((z >> d) & 1) * 4;
+        if (this.children[n].set(x, y, z, v)) {
+            this._compact();
+            return true; // changed.
+        }
+        return false;
+    }
+
+    _makeChildren() {
+        let c = this.children = new Array(8);
+        for (let i = 0; i < 8; i++) {
+            c[i] = new OctreeNode(this.depth - 1, this.value);
+        }
+    }
+
+    _compact(v) {
+        for (let i = 0; i < 8; i++) {
+            // TODO canMerge(this.children[i].value, v)
+            if (this.children[i].children !== null || this.children[i].value != v) return;
         }
         this.value = v;
         this.children = null;
-        return true; // changed.
-    }
-
-    getSubTree(x, y, z, td) {
-        if (td == 0) {
-            return this;
-        }
-        if (this.children == null) return null;
-        var d = this.depth - 1;
-        var n = ((x >> d) & 1) + ((y >> d) & 1) * 2 + ((z >> d) & 1) * 4;
-        return this.children[n].getSubTree(x, y, z, td - 1);
     }
 
     toArray() {
-        if (this.children == null) return this.value;
-        var v = [];
-        for (var i = 0; i < 8; i++) {
-            v.push(this.children[i].toArray());
-        }
-        return v;
+        return this.children === null ? this.value : this.children.map(n => n.toArray());
     }
 
-    rotate(ax) {
-        // ax : X:0 y:1 z:2
-        if (this.children == null) return;
-        var d = 1 << ax;
-        var dd = [[0, 2, 6, 4], [0, 1, 5, 4], [0, 1, 3, 2]][ax];
-        for (var i = 0; i < 2; i++) {
-            var t1 = this.children[i * d];
+    rotate90(axis) {
+        // ax : x:0 y:1 z:2
+        if (this.children === null) return;
+        let d = 1 << axis;
+        let dd = [[0, 2, 6, 4], [0, 1, 5, 4], [0, 1, 3, 2]][axis];
+        for (let i = 0; i < 2; i++) {
+            let t1 = this.children[i * d];
             this.children[i * d + dd[0]] = this.children[i * d + dd[1]];
             this.children[i * d + dd[1]] = this.children[i * d + dd[2]];
             this.children[i * d + dd[2]] = this.children[i * d + dd[3]];
             this.children[i * d + dd[3]] = t1;
         }
-        for (var i = 0; i < 8; i++) {
-            this.children[i].rotate(ax);
+        for (let i = 0; i < 8; i++) {
+            this.children[i].rotate90(axis);
         }
     }
 
-
     applyFunc(f, x, y, z, v) {
-        if (this.children == null && this.value == v) {
+        if (this.children === null && this.value == v) {
             return false;
         }
         var r = f(x, y, z, 1 << this.depth);
@@ -92,18 +86,16 @@ class OctreeNode {
             this.children = null;
             return true;
         } else if (r == 2 && this.depth > 0) { // partial
-            this.makeChildren();
+            if (this.children === null) {
+                this._makeChildren();
+            }
             var sz = 1 << (this.depth - 1);
-            var cf = false;
+            var cf = 0;
             for (var i = 0; i < 8; i++) {
                 cf |= this.children[i].applyFunc(f, x + sz * (i & 1), y + sz * ((i >> 1) & 1), z + sz * ((i >> 2) & 1), v);
             }
             if (!cf) return false;
-            for (var i = 0; i < 8; i++) {
-                if (this.children[i].children != null || this.children[i].value != v) return true;
-            }
-            this.value = v;
-            this.children = null;
+            this._compact(v);
             return true;
         }
         return false;
@@ -111,7 +103,7 @@ class OctreeNode {
 
     slice(buf, p, stride, d, ax) {
         var size = 1 << this.depth;
-        if (this.children == null) {
+        if (this.children === null) {
             for (var j = 0; j < size; j++) {
                 for (var i = 0; i < size; i++) {
                     buf[p + i] = this.value;
@@ -142,12 +134,10 @@ class OctreeNode {
     }
 
     slice2(buf, p, stride, x, y, z, n, ax) {
-        // let t = this.getSubTree(x, y, z, n);
         if (n == this.depth) {
-            this.slice(buf, p, stride, [x, y, z][ax], ax);
-            return;
+            return this.slice(buf, p, stride, [x, y, z][ax], ax);
         }
-        if (this.children == null) {
+        if (this.children === null) {
             var size = 1 << n;
             for (var j = 0; j < size; j++) {
                 for (var i = 0; i < size; i++) {
@@ -163,18 +153,44 @@ class OctreeNode {
     }
 }
 
+class Vector3 {
+    constructor(x = 0, y = 0, z = 0) {
+        this.x = x; this.y = y; this.z = z;
+    }
+    set(x, y, z) {
+        this.x = x; this.y = y; this.z = z;
+        return this;
+    }
+    copy(v) {
+        this.x = v.x; this.y = v.y; this.z = v.z;
+        return this;
+    }
+    dot(v) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+    }
+    normalize() {
+        let len = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+        if (len > 0) { this.x /= len; this.y /= len; this.z /= len; }
+        return this;
+    }
+}
+
+
 class Voxel {
     constructor(depth, subMeshLevel) {
-        this.scale = 1.0 / (1 << depth);
         this.tree = new OctreeNode(depth, 0);
-        this.colors = [[], [0.2, 0.2, 0.2, 1], [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1]];
-        this.meshCashe = [];
+        /** @type {Record<number, any[]>} */
+        this.meshMap = {};
+        /** @type {Record<number, [number, number, number, number, OctreeNode]>} */
+        this.pendingMeshMap = {};
+        /**@type {number} */
         this.subMeshLevel = subMeshLevel || 5;
+        this._smoothParams = [-0.44, -0.335, -0.25, -0.11, 0.0, 0.11, 0.25, 0.33, 0.44];
     }
 
     clear() {
+        this.clearMesh();
         this.tree = new OctreeNode(this.tree.depth, 0);
-        this.meshCashe = [];
     }
 
     size() {
@@ -189,27 +205,21 @@ class Voxel {
             let sz = 1 << d;
             let k = this.tree.depth - d;
             let n = 1 << (this.tree.depth - d);
-            for (let key of Object.keys(this.meshCashe)) {
+            for (let key of Object.keys(this.meshMap)) {
                 let x = key % n, y = (key >> k) % n, z = (key >> (k * 2)) % n;
                 if (f(x * sz - 1, y * sz - 1, z * sz - 1, sz + 2) != 0) {
-                    for (let mesh of this.meshCashe[key]) {
-                        mesh.dispose();
+                    for (let mesh of this.meshMap[key]) {
+                        this.meshDispose(mesh);
                     }
-                    console.log('invalidate', key);
-                    delete this.meshCashe[key];
+                    delete this.meshMap[key];
                 }
             }
-            // let n = 1 << (this.tree.depth - d);
-            //for (var z = 0; z < n; z++) {
-            //    for (var y = 0; y < n; y++) {
-            //        for (var x = 0; x < n; x++) {
-            //            var t = x + n * y + n * n * z;
-            //            if (this.meshCashe[t] && f(x * sz - 1, y * sz - 1, z * sz - 1, sz + 2) != 0) {
-            //                this.meshCashe[t] = null;
-            //            }
-            //        }
-            //    }
-            //}
+            for (let key of Object.keys(this.pendingMeshMap)) {
+                let x = key % n, y = (key >> k) % n, z = (key >> (k * 2)) % n;
+                if (f(x * sz - 1, y * sz - 1, z * sz - 1, sz + 2) != 0) {
+                    delete this.pendingMeshMap[key];
+                }
+            }
         }
         return ret;
     }
@@ -217,21 +227,21 @@ class Voxel {
     sphere(cx, cy, cz, r, v) {
         var rr = r * r;
         return this.applyFunc(function (x, y, z, sz) {
-            var dx = Math.max(x, Math.min(cx, x + sz)) - cx;
-            var dy = Math.max(y, Math.min(cy, y + sz)) - cy;
-            var dz = Math.max(z, Math.min(cz, z + sz)) - cz;
-            var dmin = dx * dx + dy * dy + dz * dz;
+            let dx = Math.max(x, Math.min(cx, x + sz)) - cx;
+            let dy = Math.max(y, Math.min(cy, y + sz)) - cy;
+            let dz = Math.max(z, Math.min(cz, z + sz)) - cz;
+            let dmin = dx * dx + dy * dy + dz * dz;
             if (dmin >= rr) {
                 return 0;
             }
             if (sz == 1) {
                 return 1;
             }
-            var n = 0;
-            for (var i = 0; i < 8; i++) {
-                var px = x - cx + (sz * (i & 1));
-                var py = y - cy + (sz * ((i >> 1) & 1));
-                var pz = z - cz + (sz * ((i >> 2) & 1));
+            let n = 0;
+            for (let i = 0; i < 8; i++) {
+                let px = x - cx + (sz * (i & 1));
+                let py = y - cy + (sz * ((i >> 1) & 1));
+                let pz = z - cz + (sz * ((i >> 2) & 1));
                 if (px * px + py * py + pz * pz < rr) {
                     n++;
                 }
@@ -263,7 +273,6 @@ class Voxel {
     }
 
     slice(h, ax, a, p, stride) {
-        //if (!a) a = new Array(size*size);
         var tree = this.tree;
         var size = 1 << tree.depth;
         if (h >= size || h < 0) {
@@ -280,9 +289,9 @@ class Voxel {
     }
 
     slice2(x, y, z, n, ax, buf, p, stride, subTree) {
-        var tree = this.tree;
-        var sz = 1 << tree.depth;
-        var size = 1 << n;
+        let tree = this.tree;
+        let sz = 1 << tree.depth;
+        let size = 1 << n;
         if (!buf) {
             buf = new Array((size + 2) * (size + 2));
             p = 0;
@@ -327,10 +336,9 @@ class Voxel {
     }
 
     _adjust_vart(v, a, b, p, stride, ax) {
-        var ee = [-0.44, -0.335, -0.25, -0.11, 0.0, 0.11, 0.25, 0.33, 0.44];
-
-        var n1, n2;
-        var ff = [
+        let ee = this._smoothParams;
+        let n1, n2;
+        let ff = [
             (a[p - stride - 1] > 0) | 0, (a[p - stride] > 0) | 0,
             (a[p - 1] > 0) | 0, (a[p] > 0) | 0,
             (b[p - stride - 1] > 0) | 0, (b[p - stride] > 0) | 0,
@@ -364,13 +372,12 @@ class Voxel {
             v[2] -= ee[n1 + n2];
         }
 
-        var scale = this.scale;
         if (ax == 0) {
-            return [v[0] * scale, v[1] * scale, v[2] * scale];
+            return v;
         } else if (ax == 1) {
-            return [v[2] * scale, v[0] * scale, v[1] * scale];
+            return [v[2], v[0], v[1]];
         } else {
-            return [v[1] * scale, v[2] * scale, v[0] * scale];
+            return [v[1], v[2], v[0]];
         }
     }
 
@@ -383,52 +390,78 @@ class Voxel {
     }
 
     makeMesh() {
-        var d = this.subMeshLevel;
-        var n = 1 << (this.tree.depth - d);
-        var meshes = [];
-        for (var z = 0; z < n; z++) {
-            for (var y = 0; y < n; y++) {
-                for (var x = 0; x < n; x++) {
-                    var t = x + n * y + n * n * z;
-                    if (this.meshCashe[t] == null) {
-                        this.meshCashe[t] = this.makeSubMesh(x * (1 << d), y * (1 << d), z * (1 << d), d);
-                    }
-                    meshes = meshes.concat(this.meshCashe[t]);
-                }
-            }
-        }
-        return meshes;
+        this.pendingMeshMap = {};
+        this._makeMeshInternal(0, 0, 0, this.tree.depth - this.subMeshLevel, this.tree, 0);
     }
 
-    makeSubMesh(x, y, z, depth) {
-        var colors = this.colors;
-        var mesh = { vertices: [], colors: [], triangles: [] };
-        var meshes = [mesh];
-        var w = 1;
-        var vs = 0;
-        var size = 1 << depth;
-        var stride = size + 2;
-        var a = new Array(stride * stride);
-        var b = new Array(stride * stride);
-        let v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v1c = new THREE.Vector3(), v2c = new THREE.Vector3();
-
-        var subTree = this.tree.getSubTree(x, y, z, this.tree.depth - depth);
-        let shellOnly = subTree == null || subTree.children == null;
-
-        for (var ax = 0; ax < 3; ax++) {
-            if (ax == 0) {
-                this.slice2(x - 1, y, z, depth, ax, a, 0, stride, null);
-            } else if (ax == 1) {
-                this.slice2(x, y - 1, z, depth, ax, a, 0, stride, null);
-            } else if (ax == 2) {
-                this.slice2(x, y, z - 1, depth, ax, a, 0, stride, null);
+    _makeMeshInternal(x, y, z, dd, tree, mask) {
+        // mask: (MSB) 0, +z, +y, +x, 0, -z, -y , -x  (LSB)
+        if (dd == 0) {
+            let n = 1 << (this.tree.depth - this.subMeshLevel);
+            let t = x + n * y + n * n * z;
+            if (this.meshMap[t] === undefined) {
+                let sz = 1 << this.subMeshLevel;
+                // this.meshMap[t] = this.makeSubMesh(x * sz, y * sz, z * sz, mask, tree);
+                this.pendingMeshMap[t] = [x * sz, y * sz, z * sz, mask, tree];
             }
-            for (var k = 0; k <= size; k++) {
+            return;
+        }
+        let sz = 1 << (dd - 1);
+        for (let i = 0; i < 8; i++) {
+            let child = tree && tree.children && tree.children[i];
+            let m = mask;
+            if (child === null) {
+                m &= (i << 4) | (7 ^ i);
+            } else {
+                m |= ((7 ^ i) << 4) | i;
+            }
+            if (m) {
+                this._makeMeshInternal(x + sz * (i & 1), y + sz * ((i >> 1) & 1), z + sz * ((i >> 2) & 1), dd - 1, child, m);
+            }
+        }
+    }
+
+    makeSubMesh(x, y, z, mask, subTree) {
+        let mesh = { vertices: [], materials: [], triangles: [] };
+        let meshes = [mesh];
+        let w = 1;
+        let vs = 0;
+        let depth = this.subMeshLevel;
+        let size = 1 << depth;
+        let stride = size + 2;
+        let a = new Array(stride * stride);
+        let b = new Array(stride * stride);
+        let v1 = new Vector3(), v2 = new Vector3(), v1c = new Vector3(), v2c = new Vector3();
+
+        let shellOnly = subTree === null || subTree.children === null;
+
+        let m = mask | (mask >> 4);
+        for (var ax = 0; ax < 3; ax++) {
+            let st = 0, en = size;
+            if (shellOnly) {
+                if ((m & (1 << ax)) == 0) {
+                    continue;
+                }
+                if ((mask & (1 << ax)) == 0) {
+                    st++;
+                }
+                if ((mask & (1 << (ax + 4))) == 0) {
+                    en--;
+                }
+            }
+
+            if (ax == 0) {
+                this.slice2(x + st - 1, y, z, depth, ax, a, 0, stride, null);
+            } else if (ax == 1) {
+                this.slice2(x, y + st - 1, z, depth, ax, a, 0, stride, null);
+            } else if (ax == 2) {
+                this.slice2(x, y, z + st - 1, depth, ax, a, 0, stride, null);
+            }
+            for (var k = st; k <= en; k++) {
                 var p = stride + 1;
                 if (shellOnly && k != 0 && k < size - 1) {
                     continue;
                 }
-                // b = this.slice(k, ax, b, p, stride);
                 if (ax == 0) {
                     this.slice2(x + k, y, z, depth, ax, b, 0, stride, k != size ? subTree : null);
                 } else if (ax == 1) {
@@ -442,48 +475,44 @@ class Voxel {
                 }
 
                 for (var j = 0; j < size; j++) {
-                    // var v1, v2;
                     var l = 0;
                     for (var i = 0; i < size; i++) {
-                        var f = (a[p + i] == 0 || b[p + i] == 0) ? b[p + i] - a[p + i] : 0;
+                        var pp = p + i;
+                        var f = (a[pp] == 0 || b[pp] == 0) ? b[pp] - a[pp] : 0;
                         if (f == 0) {
                             l = 0;
                             continue;
                         }
 
-                        // 150ms
-                        var pp = p + i;
-                        var p1 = l == f ? mesh.vertices[vs - 3].slice() : this._adjust_vart([k, i, j], a, b, pp, stride, ax);
+                        var p1 = l == f ? mesh.vertices[vs - 3] : this._adjust_vart([k, i, j], a, b, pp, stride, ax);
                         var p2 = this._adjust_vart([k, i + w, j], a, b, pp + 1, stride, ax);
-                        var p3 = l == f ? mesh.vertices[vs - 1].slice() : this._adjust_vart([k, i, j + w], a, b, pp + stride, stride, ax);
+                        var p3 = l == f ? mesh.vertices[vs - 1] : this._adjust_vart([k, i, j + w], a, b, pp + stride, stride, ax);
                         var p4 = this._adjust_vart([k, i + w, j + w], a, b, pp + stride + 1, stride, ax);
                         v1c.set(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]).normalize();
                         v2c.set(p4[0] - p3[0], p4[1] - p3[1], p4[2] - p3[2]).normalize();
 
-                        if (l == f && v1c.dot(v1) > 0.99 && v2c.dot(v2) > 0.99) { // 30ms?
+                        if (l == f && v1c.dot(v1) > 0.99 && v2c.dot(v2) > 0.99) {
                             mesh.vertices[vs - 1] = p4;
                             mesh.vertices[vs - 3] = p2;
                         } else {
                             v1.copy(v1c);
                             v2.copy(v2c);
                             l = f;
-                            if (vs > 655320) {
-                                // webgl without extension.
-                                l = 0;
-                                vs = 0;
-                                mesh = mesh = { vertices: [], colors: [], triangles: [] };
-                                meshes.push(mesh);
-                            }
+                            //if (vs > 65532) {
+                            //    // webgl 1 without extension.
+                            //    l = 0;
+                            //    vs = 0;
+                            //    mesh = mesh = { vertices: [], materials: [], triangles: [] };
+                            //    meshes.push(mesh);
+                            //}
                             mesh.vertices.push(p1, p2, p3, p4);
-                            var color;
                             if (f > 0) {
                                 mesh.triangles.push([vs + 0, vs + 2, vs + 1], [vs + 2, vs + 3, vs + 1]);
-                                color = colors[f];
+                                mesh.materials.push(f, f, f, f);
                             } else {
                                 mesh.triangles.push([vs + 0, vs + 1, vs + 2], [vs + 2, vs + 1, vs + 3]);
-                                color = colors[-f];
+                                mesh.materials.push(-f, -f, -f, -f);
                             }
-                            mesh.colors.push(color, color, color, color);
                             vs += 4;
                         }
                     }
@@ -494,34 +523,50 @@ class Voxel {
         }
 
         if (vs == 0) meshes.pop();
-        for (var i = 0; i < meshes.length; i++) {
-            for (var v = 0; v < meshes[i].vertices.length; v++) {
-                meshes[i].vertices[v][0] += x * this.scale;
-                meshes[i].vertices[v][1] += y * this.scale;
-                meshes[i].vertices[v][2] += z * this.scale;
+        return meshes.map(attrs => this.meshCreate(attrs, [x, y, z]));
+    }
+
+    getMeshes() {
+        this.genMesh(-1);
+        return [].concat(...Object.values(this.meshMap));
+    }
+
+    clearMesh() {
+        for (let meshes of Object.values(this.meshMap)) {
+            for (let mesh of meshes) {
+                this.meshDispose(mesh);
             }
         }
-        return meshes.map(mesh => {
-            // console.log(" vs:" + mesh.vertices.length);
-            let geometry = new THREE.BufferGeometry();
-            let vertices = new Float32Array(mesh.vertices.length * 3);
-            mesh.vertices.forEach((v, i) => vertices.set(v, i * 3));
-            let colors = new Float32Array(mesh.colors.length * 4);
-            mesh.colors.forEach((v, i) => colors.set(v, i * 4));
-            let indics = mesh.vertices.length > 65535 ?
-                new Uint32Array(mesh.triangles.length * 3) :
-                new Uint16Array(mesh.triangles.length * 3);
-            mesh.triangles.forEach((v, i) => indics.set(v, i * 3));
+        this.meshMap = {};
+        this.pendingMeshMap = {};
+    }
 
-            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
-            geometry.setIndex(new THREE.BufferAttribute(indics, 1));
-            geometry.computeVertexNormals();
+    /**
+     * TODO: timeslice
+     * @param {number} n
+     */
+    genMesh(n) {
+        for (let [key, params] of Object.entries(this.pendingMeshMap)) {
+            if (n >= 0 && --n < 0) {
+                break;
+            }
+            delete this.pendingMeshMap[key];
+            this.meshMap[key] = this.makeSubMesh.apply(this, params);
+        }
+    }
 
-            return geometry;
-        });
+    meshCreate(attrs, origin) {
+        return attrs;
+    }
+
+    meshDispose(mesh) {
+    }
+
+    dispose() {
+        this.clearMesh();
     }
 }
+
 
 class Bullet {
     constructor(world, p, v) {
@@ -557,15 +602,44 @@ class Bullet {
 class Target {
     constructor(world, spec) {
         console.log(spec);
+        this.colors = [[], [0.2, 0.2, 0.2, 1], [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1]];
         this.hp = spec.life;
         this.spin = new THREE.Vector3().fromArray(spec.spin || [0, 0, 0]).multiplyScalar(Math.PI / 180);
         this.spinAmount = this.spin.length();
         this.spin.normalize();
         this.live = true;
-        this.voxelObj = null;
+        this.voxelObj = new THREE.Group();
+        this.mat = new THREE.MeshStandardMaterial({ color: 0xaaaacc, roughness: 0.5, vertexColors: true });
 
         console.time('makeVoxel');
         let voxel = new Voxel(7);
+        voxel.meshDispose = (mesh) => {
+            this.voxelObj.remove(mesh);
+            console.log(mesh);
+            mesh.geometry.dispose();
+        };
+        voxel.meshCreate = (attrs, pos) => {
+            // console.log(" vs:" + mesh.vertices.length);
+            let geometry = new THREE.BufferGeometry();
+            let vertices = new Float32Array(attrs.vertices.length * 3);
+            let scale = 1.0 / voxel.size();
+            attrs.vertices.forEach((v, i) => vertices.set([(v[0] + pos[0]) * scale, (v[1] + pos[1]) * scale, (v[2] + pos[2]) * scale], i * 3));
+            let colors = new Float32Array(attrs.materials.length * 4);
+            attrs.materials.forEach((v, i) => colors.set(this.colors[v], i * 4));
+            let indics = attrs.vertices.length > 65535 ?
+                new Uint32Array(attrs.triangles.length * 3) :
+                new Uint16Array(attrs.triangles.length * 3);
+            attrs.triangles.forEach((v, i) => indics.set(v, i * 3));
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+            geometry.setIndex(new THREE.BufferAttribute(indics, 1));
+            geometry.computeVertexNormals();
+
+            let mesh = new THREE.Mesh(geometry, this.mat);
+            this.voxelObj.add(mesh);
+            return mesh;
+        };
         this.voxel = voxel;
         spec.body(voxel);
         spec.core(voxel);
@@ -576,28 +650,16 @@ class Target {
         g.position.set(0, 2, -6);
         this.obj = g;
         world.add(g);
+        this.voxelObj.position.set(-0.5, -0.5, -0.5);
+        this.obj.add(this.voxelObj);
         this.voxelUpdated = true;
-        this.mat = new THREE.MeshStandardMaterial({ color: 0xaaaacc, roughness: 0.5, vertexColors: THREE.VertexColors });
         this.tmpV = new THREE.Vector3();
     }
 
     _updateMesh() {
-        let voxel = this.voxel;
-
         console.time('makeMesh');
-        let geometries = voxel.makeMesh();
+        this.voxel.makeMesh();
         console.timeEnd('makeMesh');
-
-        console.time('makeObjs');
-        let meshes = geometries.map(geometry => new THREE.Mesh(geometry, this.mat));
-        console.timeEnd('makeObjs');
-
-        if (this.voxelObj) {
-            this.obj.remove(this.voxelObj);
-        }
-        this.voxelObj = new THREE.Group().add(...meshes);
-        this.voxelObj.position.set(-0.5, -0.5, -0.5);
-        this.obj.add(this.voxelObj);
     }
 
     update(timeDelta) {
@@ -605,6 +667,7 @@ class Target {
             this._updateMesh();
             this.voxelUpdated = false;
         }
+        this.voxel.genMesh(10);
         if (this.hp > 0) {
             this.obj.rotateOnAxis(this.spin, this.spinAmount * timeDelta * 0.001);
         } else {
@@ -638,7 +701,7 @@ class Target {
 
     dispose() {
         if (!this.live) return;
-        // TODO: dispose cache
+        this.voxel.dispose();
         this.mat.dispose();
         this.obj.parent.remove(this.obj);
         this.live = false;
@@ -699,7 +762,7 @@ const enemies = {
         },
         core: function (voxel) {
             var c = voxel.size() / 2;
-            return voxel.sphere(c, c * 1.5, c, c / 6, 2)
+            return voxel.sphere(c, c * 1.5, c, c / 6, 2);
         },
         spin: [0, 0, 0],
         rot: [0, 0, 0]
@@ -714,7 +777,7 @@ const enemies = {
         },
         core: function (voxel) {
             var c = voxel.size() / 2;
-            return voxel.sphere(c, c, c, c / 3, 2)
+            return voxel.sphere(c, c, c, c / 3, 2);
         },
         spin: [0, 90, 0],
         rot: [0, 0, 0]
