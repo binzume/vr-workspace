@@ -8,7 +8,7 @@ function bvhContentHandler(content) {
 	if (content.name.toLowerCase().endsWith('.bvh') || content.name.toLowerCase().endsWith('.vmd')) {
 		let activeModel = document.activeElement && document.activeElement.hasAttribute('vrm') && document.activeElement;
 		if (activeModel) {
-			activeModel.setAttribute('vrm-bvh', 'src', content.url);
+			activeModel.setAttribute('vrm-anim', 'src', content.url);
 			return true;
 		}
 	}
@@ -62,7 +62,7 @@ AFRAME.registerComponent('vrm-select', {
 				// loAd
 				let poseJson = localStorage.getItem('vrm-pose01');
 				if (poseJson) {
-					el.removeAttribute('vrm-bvh');
+					el.removeAttribute('vrm-anim');
 					el.components.vrm.avatar.setPose(JSON.parse(poseJson));
 				}
 			}
@@ -76,6 +76,8 @@ AFRAME.registerComponent('vrm-select', {
 AFRAME.registerComponent('vrm-control-panel', {
 	schema: {},
 	init() {
+		this.vrmEl = null;
+		this.models = [];
 		this._elByName('blink-toggle').addEventListener('change', (ev) => {
 			if (!this.vrmEl) { return; }
 			this.vrmEl.setAttribute('vrm', 'blink', ev.detail.value);
@@ -103,7 +105,7 @@ AFRAME.registerComponent('vrm-control-panel', {
 		this._elByName('pose-edit-toggle').addEventListener('change', (ev) => {
 			if (!this.vrmEl) { return; }
 			if (ev.detail.value) {
-				this.vrmEl.removeAttribute('vrm-bvh');
+				this.vrmEl.removeAttribute('vrm-anim');
 				this.vrmEl.setAttribute('vrm-poser', {});
 			} else {
 				this.vrmEl.removeAttribute('vrm-poser');
@@ -124,7 +126,7 @@ AFRAME.registerComponent('vrm-control-panel', {
 			if (!this.vrmEl) { return; }
 			let poseJson = localStorage.getItem('vrm-' + ev.detail.value);
 			if (poseJson) {
-				this.vrmEl.removeAttribute('vrm-bvh');
+				this.vrmEl.removeAttribute('vrm-anim');
 				if (this.vrmEl.hasAttribute('vrm-poser')) {
 					this.vrmEl.components['vrm-poser'].setPoseData(JSON.parse(poseJson));
 				} else {
@@ -134,41 +136,71 @@ AFRAME.registerComponent('vrm-control-panel', {
 		});
 		this._elByName('pose-reset-button').addEventListener('click', (ev) => {
 			if (!this.vrmEl) { return; }
-			this.vrmEl.removeAttribute('vrm-bvh');
+			this.vrmEl.removeAttribute('vrm-anim');
 			this.vrmEl.components.vrm.avatar.restPose();
 		});
 
-		this._elByName('unload-button').addEventListener('click', (ev) => {
+
+		this._elByName('pause-button').addEventListener('click', (ev) => {
 			if (!this.vrmEl) { return; }
-			this.vrmEl.parentNode.removeChild(this.vrmEl);
-			this._setVrmEl(document.querySelector('[vrm]'));
+			if (this.vrmEl.components.vrm.avatar.mixer.timeScale > 0) {
+				for (let el of this._getTargetEls()) {
+					el.components.vrm.avatar.mixer.timeScale = 0;
+				}
+			} else {
+				for (let el of this._getTargetEls()) {
+					el.components.vrm.avatar.mixer.timeScale = 1;
+				}
+			}
 		});
 
+		this._elByName('rewind-button').addEventListener('click', (ev) => {
+			for (let vrmEl of this._getTargetEls()) {
+				vrmEl.components.vrm.avatar.mixer.setTime(0);
+			}
+		});
+
+		this._timeText = this._elByName('time-text');
+		this._onComponentRemoved = this._onComponentRemoved.bind(this);
+		this._onComponentChanged = this._onComponentChanged.bind(this);
+		this._onModelLoaded = (ev) => this._setAvatar(ev.detail.avatar);
+
 		this._initBlendShapeList();
+		this._initModelList();
 
 		this._onFocusInEvent = (ev) => {
 			if (ev.target.hasAttribute('vrm')) {
 				this._setVrmEl(ev.target);
 			}
+			this._updateModelList();
 		};
-		this._onModelLoaded = (ev) => this._setAvatar(ev.detail.avatar);
 		document.body.addEventListener('focusin', this._onFocusInEvent);
 		this._setVrmEl(document.querySelector('[vrm]'));
 	},
 	remove() {
 		document.body.removeEventListener('focusin', this._onFocusInEvent);
+		for (let el of this.models) {
+			el.removeEventListener('componentremoved', this._onComponentRemoved);
+		}
 		this._setVrmEl(null);
+	},
+	tick() {
+		if (!this.vrmEl || !this.vrmEl.components.vrm.avatar) { return; }
+		let t = this.vrmEl.components.vrm.avatar.mixer.time | 0;
+		this._timeText.setAttribute('value', `${(t / 60 | 0).toString().padStart(2, '0')}:${(t % 60).toString().padStart(2, '0')}`);
 	},
 	_setVrmEl(vrmEl) {
 		if (this.vrmEl) {
 			this.vrmEl.removeEventListener('model-loaded', this._onModelLoaded);
+			this.vrmEl.removeEventListener('componentchanged', this._onComponentChanged);
 		}
 		this.vrmEl = vrmEl;
 		if (vrmEl == null) {
 			return;
 		}
+		vrmEl.addEventListener('componentchanged', this._onComponentChanged);
 		vrmEl.addEventListener('model-loaded', this._onModelLoaded);
-		if (vrmEl.components.vrm.avatar) {
+		if (vrmEl.components.vrm && vrmEl.components.vrm.avatar) {
 			this._setAvatar(vrmEl.components.vrm.avatar);
 		}
 		let attrs = vrmEl.getAttribute('vrm');
@@ -187,10 +219,37 @@ AFRAME.registerComponent('vrm-control-panel', {
 		this._elByName('pose-edit-toggle').value = vrmEl.hasAttribute('vrm-poser');
 		// @ts-ignore
 		this._elByName('skeleton-toggle').value = vrmEl.hasAttribute('vrm-skeleton');
+
+		let anim = vrmEl.getAttribute('vrm-anim');
+		if (!anim) {
+			return;
+		}
+		let path = decodeURI(anim.src);
+		this._elByName('motion-name').setAttribute('value', path.split('/').pop());
+	},
+	_getTargetEls() {
+		// @ts-ignore
+		let sync = this._elByName('sync-toggle').value;
+		if (sync) return this.models;
+		return this.vrmEl ? [this.vrmEl] : [];
 	},
 	_setAvatar(avatar) {
 		this.vrm = avatar;
 		this._elByName('blend-shape-list').components.xylist.setContents(Object.keys(this.vrm.blendShapes));
+	},
+	_onComponentChanged(ev) {
+		if (ev.detail.name == 'vrm') {
+			this._updateModelList();
+		} else if (ev.detail.name == 'vrm-anim') {
+			let path = decodeURI(this.vrmEl.components['vrm-anim'].data.src);
+			this._elByName('motion-name').setAttribute('value', path.split('/').pop());
+			// this.play();
+		}
+	},
+	_onComponentRemoved(ev) {
+		if (ev.detail.name == 'vrm') {
+			this._updateModelList();
+		}
 	},
 	_initBlendShapeList() {
 		let listEl = this._elByName('blend-shape-list');
@@ -221,6 +280,58 @@ AFRAME.registerComponent('vrm-control-panel', {
 			this.vrm.resetBlendShape();
 			list.setContents(Object.keys(this.vrm.blendShapes));
 		});
+	},
+	_initModelList() {
+		let listEl = this._elByName('model-list');
+		let list = listEl.components.xylist;
+		let self = this;
+		list.setAdapter({
+			create() {
+				let el = document.createElement('a-plane');
+				el.setAttribute('width', 2.5);
+				el.setAttribute('height', 0.4);
+				el.setAttribute('xyrect', {});
+				el.setAttribute('xylabel', { wrapCount: 16, renderingMode: 'canvas' });
+				let unloadButton = document.createElement('a-xybutton');
+				unloadButton.setAttribute('width', 0.3);
+				unloadButton.setAttribute('height', 0.3);
+				unloadButton.setAttribute('position', { x: 1.0, y: 0, z: 0.05 });
+				unloadButton.setAttribute('label', "X");
+				unloadButton.addEventListener('click', (ev) => {
+					let vrmEl = self.models[el.dataset.index];
+					if (vrmEl == self.vrmEl) {
+						self._setVrmEl(null);
+					}
+					vrmEl.parentNode.removeChild(vrmEl);
+					self._updateModelList();
+				});
+				el.appendChild(unloadButton);
+				return el;
+			},
+			bind(position, el, contents) {
+				let path = decodeURI(contents[position].components.vrm.data.src);
+				el.dataset.index = position;
+				el.setAttribute('color', contents[position] == this.vrmEl ? 'green' : 'black');
+				el.setAttribute('xylabel', { value: path.split('/').pop() });
+			}
+		});
+		listEl.addEventListener('clickitem', (ev) => {
+			this._setVrmEl(this.models[ev.detail.index]);
+			this.models[ev.detail.index].focus();
+		});
+
+		this._updateModelList();
+	},
+	_updateModelList() {
+		let listEl = this._elByName('model-list');
+		for (let el of this.models) {
+			el.removeEventListener('componentremoved', this._onComponentRemoved);
+		}
+		this.models = this.el.sceneEl.querySelectorAll('[vrm]');
+		for (let el of this.models) {
+			el.addEventListener('componentremoved', this._onComponentRemoved);
+		}
+		listEl.components.xylist.setContents(this.models);
 	},
 	/**
 	 * @param {string} name 

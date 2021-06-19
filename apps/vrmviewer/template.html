@@ -6,45 +6,58 @@
   <title>vrmviewer</title>
   <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
   <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
-  <script id='script-physics' src="//cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
-  <script id='script-vrm' src="https://binzume.github.io/aframe-vrm/vrm.js"></script>
+  <script id='script-physics' src="https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
+  <script id='script-vrm' src="https://binzume.github.io/aframe-vrm/dist/aframe-vrm.js"></script>
   <script src="vrmviewer.js"></script>
 </head>
 
 <body style="background-color: black; color:white;">
   <a-scene>
+    <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable"></a-entity>
 
     <!-- VRM -->
-    <a-entity id="app" vrm-select xy-drag-control="draggable:.stage" vrm="lookAt:a-camera;enablePhysics:true" vrm-bvh="" rotation="0 180 0" position="0 0 -1">
+    <a-entity id="app" vrm-select xy-drag-control="draggable:.stage" vrm="lookAt:a-camera;enablePhysics:true" vrm-anim="" rotation="0 180 0" position="0 0 -1">
       <a-box class="stage collidable" wireframe='true' width="0.4" depth="0.4" height="0.04" position="0 -0.02 0">
       </a-box>
     </a-entity>
 
     <!-- VRM Control panel -->
-    <a-xywindow id="app-vrm-control-panel" vrm-control-panel position="1 1 -2" scale="0.2 0.2 0.2" title="VRM Control Panel" width="6.2" height="4"
-      xywindow="background:true" xycontainer="direction:row;spacing:0.2">
-      <a-xycontainer width="3" height="4" direction="column" align-items="stretch">
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+    <a-xywindow id="app-vrm-control-panel" vrm-control-panel position="1 1 -2" scale="0.15 0.15 0.15" title="VRM Control Panel" width="8.3" height="4"
+      xywindow="background:true" xycontainer="direction:row;spacing:0.1">
+
+      <a-xycontainer width="2.5" height="4" direction="column" align-items="center">
+        <a-xylabel value="Objects" width="2.5" height="0.4"></a-xylabel>
+        <a-xycontainer width="2.5" height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+          <a-xylabel value="Sync" width="1.5" height="0.4"></a-xylabel>
+          <a-xytoggle name="sync-toggle" value="true"></a-xytoggle>
+        </a-xycontainer>
+        <a-xyscroll width=2.5 height="3.2" scrollbar=false>
+          <a-entity name="model-list" xylist="itemHeight:0.41" xyrect="width:2.5"></a-entity>
+        </a-xyscroll>
+      </a-xycontainer>
+
+      <a-xycontainer width="2.5" height="4" direction="column" align-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="AutoBlink" width="2"></a-xylabel>
           <a-xytoggle name="blink-toggle" value="true"></a-xytoggle>
         </a-xycontainer>
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="LookAtCam" width="2"></a-xylabel>
           <a-xytoggle name="lookat-toggle" value="true"></a-xytoggle>
         </a-xycontainer>
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="Physics" width="2"></a-xylabel>
           <a-xytoggle name="physics-toggle" value="false"></a-xytoggle>
         </a-xycontainer>
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="FirstPerson" width="2"></a-xylabel>
           <a-xytoggle name="first-person-toggle" value="false"></a-xytoggle>
         </a-xycontainer>
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="Skeleton" width="2"></a-xylabel>
           <a-xytoggle name="skeleton-toggle" value="false"></a-xytoggle>
         </a-xycontainer>
-        <a-xycontainer height="0.5" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
           <a-xylabel value="Edit Pose" width="2"></a-xylabel>
           <a-xytoggle name="pose-edit-toggle" value="false"></a-xytoggle>
         </a-xycontainer>
@@ -53,14 +66,22 @@
           <a-xyselect name="pose-load-button" label="Load Pose"></a-xyselect>
           <a-xybutton name="pose-reset-button" label="T-Pose"></a-xybutton>
         </a-xycontainer>
-        <a-xybutton name="unload-button" label="Unload VRM" height="0.4"></a-xybutton>
+        <a-xylabel name="motion-name" value="" width="2.5" height="0.4"></a-xylabel>
+        <a-xycontainer height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+          <a-xylabel name="time-text" value="00:00" width="2"></a-xylabel>
+          <a-xybutton name="rewind-button" label="&#x23EE;&#xFE0E;" height="0.4"></a-xybutton>
+          <a-xybutton name="pause-button" label="&#x23F8;&#xFE0E;" height="0.4"></a-xybutton>
+        </a-xycontainer>
       </a-xycontainer>
 
       <a-xycontainer width="3" height="4" direction="column" align-items="center">
+        <a-xycontainer width="3" height="0.4" direction="row" align-items="center">
+          <a-xylabel value="Morph" width="1.5" height="0.4"></a-xylabel>
+          <a-xybutton name="blend-shape-reset" label="Reset" width="1.5" height="0.4"></a-xybutton>
+        </a-xycontainer>
         <a-xyscroll width=3 height=3.6 scrollbar=false>
-          <a-entity name="blend-shape-list" xylist="itemHeight:0.5" xyrect="width:3"></a-entity>
+          <a-entity name="blend-shape-list" xylist="itemHeight:0.41" xyrect="width:3"></a-entity>
         </a-xyscroll>
-        <a-xybutton name="blend-shape-reset" label="ResetMorph" width=3 height=0.4></a-xybutton>
       </a-xycontainer>
 
     </a-xywindow>
