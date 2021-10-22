@@ -19,7 +19,7 @@ class AppManager {
 	/**
 	 * @param {string} selector
 	 */
-	loadApps(selector) {
+	loadAppList(selector) {
 		// TODO: support manifest file.
 		/** @type {AppInfo[]} */
 		let apps = [];
@@ -175,6 +175,8 @@ class AppManager {
 		let base = new URL(location.href);
 		let srcSceneEl = null;
 		let template;
+		/** @type {HTMLScriptElement[]} */
+		let deferredScripts = [];
 
 		if (srcUrl == '') {
 			template = document.getElementById(id);
@@ -188,15 +190,11 @@ class AppManager {
 			doc.head.append(baseEl);
 			base = new URL(srcUrl);
 
-			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('head>script[src]'))) {
-				for (let [name, id] of [['aframe-master.min.js', 'script-aframe'], ['xylayout-all.min.js', 'script-xylayout']]) {
-					if (!script.id && script.src.includes(name)) {
-						console.warn(srcUrl, "id:" + id);
-						script.id = id;
-					}
-				}
-				await this._loadModule(script.src, script.id);
+			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('head>script'))) {
+				await this._procScriptEl(script, srcUrl);
 			}
+			deferredScripts = Array.from(/** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('body>script')))
+
 			for (let img of /** @type {NodeListOf<HTMLImageElement>} */(doc.querySelectorAll('a-assets>img'))) {
 				if (img.id && !document.getElementById(img.id)) {
 					img.src = img.src; // apply base url.
@@ -234,8 +232,34 @@ class AppManager {
 		let appEl = /** @type {AFRAME.AEntity} */ (wrapper.firstElementChild);
 		appEl.id = instanceId || '';
 		(parent || document.querySelector('a-scene')).appendChild(appEl);
+
+		for (let script of deferredScripts) {
+			await this._procScriptEl(script, srcUrl);
+		}
+		
 		return appEl;
 	}
+
+	/**
+	 * 
+	 * @param {HTMLScriptElement} script 
+	 * @param {string} srcUrl 
+	 */
+	async _procScriptEl(script, srcUrl) {
+		for (let [name, id] of [['aframe-master.min.js', 'script-aframe'], ['xylayout-all.min.js', 'script-xylayout']]) {
+			if (!script.id && script.src.includes(name)) {
+				console.warn(srcUrl, "id:" + id);
+				script.id = id;
+			}
+		}
+		if (script.src) {
+			await this._loadModule(script.src, script.id);
+		} else {
+			if (script.innerText != "" && (script.type == "text/javascript" || script.type == "")) {
+				this._execScript(script.innerText, script.id, srcUrl);
+			}
+		}
+}
 
 	/**
 	 * 
@@ -252,6 +276,26 @@ class AppManager {
 		if (!this.loadedModules.has(src)) {
 			this.loadedModules.add(src);
 			await import(src);
+		}
+	}
+
+	/**
+	 * 
+	 * @param {string} code
+	 * @param {string} [id] 
+	 * @param {string} [srcUrl] 
+	 */
+	 async _execScript(code, id, srcUrl) {
+		if (id) {
+			if (this.loadedModules.has(id)) {
+				return;
+			}
+			this.loadedModules.add(id);
+		}
+		try {
+			eval(code)
+		} catch (e) {
+			console.error("error while executing embedded script: ", srcUrl, e);
 		}
 	}
 }
@@ -612,7 +656,7 @@ AFRAME.registerComponent('window-locator', {
 
 
 window.addEventListener('DOMContentLoaded', async (ev) => {
-	appManager.loadApps('#applications>a');
+	appManager.loadAppList('#applications>a');
 
 	appManager.launch('main-menu', null, { disableWindowLocator: true });
 
