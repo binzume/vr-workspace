@@ -4,16 +4,12 @@ import { Entity, Scene } from "aframe"
 
 declare module "aframe" {
     export interface EntityEventMap {
-        click: DetailEvent<{ intersection: any }>
+        click: DetailEvent<{ intersection: any, cursorEl: Entity<any>}>
         keydown: KeyboardEvent
         keypress: KeyboardEvent
         thumbstickmoved: DetailEvent<{ x: number, y: number }>
         object3dset: DetailEvent<{ object: any }>
-        clickitem: DetailEvent<{ index: number }>
-        change: DetailEvent<{ value: any, index?: number }>
         gesture: DetailEvent<{ name: string, center: any }>
-        xyviewport: DetailEvent<number[]>
-        'xy-drag': DetailEvent<{ raycaster: any, point: any, pointDelta: any }>
         'app-launch': DetailEvent<{ appManager: AppManager, app: any, args: any, content: any }>
     }
 
@@ -33,7 +29,7 @@ declare module "aframe" {
         addEventListener<K extends keyof EntityEventMap>(
             type: K,
             listener: (event: Event & EntityEventMap[K]) => void,
-            useCapture?: boolean | { once?: boolean }
+            useCapture?: boolean | { once?: boolean 
         ): void;
     }
 }
