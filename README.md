@@ -31,6 +31,7 @@ OculusQuest等で上記URLにアクセスして `VR` ボタンをクリックし
   - Google Drive client
   - WebkitFileSystem
   - Demo storage (Read Only)
+- WebRTC Remote Desktop ( https://github.com/binzume/webrtc-rdp )
 - VNC Client (needs websockify)
 - VRM model viewer
 
