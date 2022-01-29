@@ -236,7 +236,7 @@ class AppManager {
 		for (let script of deferredScripts) {
 			await this._procScriptEl(script, srcUrl);
 		}
-		
+
 		return appEl;
 	}
 
@@ -259,7 +259,7 @@ class AppManager {
 				this._execScript(script.innerText, script.id, srcUrl);
 			}
 		}
-}
+	}
 
 	/**
 	 * 
@@ -285,7 +285,7 @@ class AppManager {
 	 * @param {string} [id] 
 	 * @param {string} [srcUrl] 
 	 */
-	 async _execScript(code, id, srcUrl) {
+	async _execScript(code, id, srcUrl) {
 		if (id) {
 			if (this.loadedModules.has(id)) {
 				return;
@@ -482,7 +482,7 @@ AFRAME.registerComponent('camera-control', {
 		if (sky) {
 			sky.object3D.visible = !this.el.sceneEl.is('ar-mode');
 		}
-		if (this.el.sceneEl.is('vr-mode')) {
+		if (this.el.sceneEl.is('vr-mode') || this.el.sceneEl.is('ar-mode')) {
 			this.el.setAttribute('position', this.data.vrHomePosition);
 		} else {
 			this.el.setAttribute('position', this.data.homePosition);
@@ -616,19 +616,24 @@ AFRAME.registerComponent('window-locator', {
 		let el = this.el;
 		let windowEls = Array.from(el.sceneEl.querySelectorAll('a-xywindow'));
 
-		let pos = this.el.object3D.position;
+		let pos = el.object3D.position;
 		if (!oldData.applyCameraPos && this.data.applyCameraPos) {
-			let camPos = new THREE.Vector3();
-			let camRot = new THREE.Quaternion();
-			let h = pos.y;
+			let cameraRigEl = document.querySelector('#camera-rig');
+			let base = new THREE.Vector3();
+			cameraRigEl && cameraRigEl.object3D.getWorldPosition(base);
 			if (el.sceneEl.is('vr-mode')) {
-				pos.x = 0;
-				pos.y = 0;
+				pos.set(0, 0, pos.z).applyMatrix4(el.sceneEl.camera.matrixWorld);
+			} else {
+				let camPos = new THREE.Vector3();
+				let camRot = new THREE.Quaternion();
+				el.sceneEl.camera.matrixWorld.decompose(camPos, camRot, new THREE.Vector3());
+				let y = base.y + pos.y;
+				pos.applyQuaternion(camRot);
+				pos.add(camPos);
+				pos.y = y;
 			}
-			el.sceneEl.camera.matrixWorld.decompose(camPos, camRot, new THREE.Vector3());
-			pos.applyQuaternion(camRot);
-			pos.add(camPos);
-			pos.y = Math.max(Math.min(pos.y, h + 1), 0);
+			let rect = el.components.xyrect || { width: 1, height: 1 };
+			pos.y = Math.max(pos.y, base.y + rect.height * el.object3D.scale.y / 2);
 		}
 
 		let dd = this.data.interval;
@@ -662,7 +667,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 
 	let sceneEl = document.querySelector('a-scene');
 	if (window.isSecureContext && sceneEl.components['device-orientation-permission-ui']) {
-		sceneEl.components['device-orientation-permission-ui'].showHTTPAlert = () => {};
+		sceneEl.components['device-orientation-permission-ui'].showHTTPAlert = () => { };
 	}
 
 	// gesture
