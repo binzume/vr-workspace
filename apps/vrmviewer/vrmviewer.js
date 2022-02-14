@@ -111,6 +111,15 @@ AFRAME.registerComponent('vrm-control-panel', {
 				this.vrmEl.removeAttribute('vrm-poser');
 			}
 		});
+		this._elByName('drag-toggle').addEventListener('change', (ev) => {
+			this.models = this.el.sceneEl.querySelectorAll('[vrm]');
+			for (let vrmEl of this.models) {
+				for (let el of vrmEl.querySelectorAll('.stage')) {
+					ev.detail.value ? el.classList.add('collidable') : el.classList.remove('collidable');
+					el.setAttribute('visible', ev.detail.value ? 'true' : 'false');
+				}
+			}
+		});
 
 		// Pose save/load/reset
 		let poseNames = ['pose01', 'pose02', 'pose03'];

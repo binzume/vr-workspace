@@ -4,6 +4,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <title>vrmviewer</title>
+  <script type="importmap">{"imports": {"three": "https://threejs.org/build/three.module.js"}}</script>
   <script id='script-aframe' src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
   <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
   <script id='script-physics' src="https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js"></script>
@@ -17,8 +18,7 @@
 
     <!-- VRM -->
     <a-entity id="app" vrm-select xy-drag-control="draggable:.stage" vrm="lookAt:a-camera;enablePhysics:true" vrm-anim="" rotation="0 180 0" position="0 0 -1">
-      <a-box class="stage collidable" wireframe='true' width="0.4" depth="0.4" height="0.04" position="0 -0.02 0">
-      </a-box>
+      <a-plane class="stage collidable" wireframe='true' width="0.5" height="0.5" side="double" rotation="-90 0 0"></a-plane>
     </a-entity>
 
     <!-- VRM Control panel -->
@@ -31,7 +31,11 @@
           <a-xylabel value="Sync" width="1.5" height="0.4"></a-xylabel>
           <a-xytoggle name="sync-toggle" value="true"></a-xytoggle>
         </a-xycontainer>
-        <a-xyscroll width=2.5 height="3.2" scrollbar=false>
+        <a-xycontainer width="2.5" height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
+          <a-xylabel value="Drag" width="1.5" height="0.4"></a-xylabel>
+          <a-xytoggle name="drag-toggle" value="true"></a-xytoggle>
+        </a-xycontainer>
+        <a-xyscroll width=2.5 height="2.8" scrollbar=false>
           <a-entity name="model-list" xylist="itemHeight:0.41" xyrect="width:2.5"></a-entity>
         </a-xyscroll>
       </a-xycontainer>
