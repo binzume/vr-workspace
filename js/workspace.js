@@ -76,6 +76,7 @@ class AppManager {
 			return null;
 		}
 		let el = await this._instantiate(app.url, app.type, sceneEl, app.type == 'env' ? 'env' : app.wid);
+		el.setAttribute('vrapp', '');
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
@@ -298,9 +299,38 @@ class AppManager {
 			console.error("error while executing embedded script: ", srcUrl, e);
 		}
 	}
+
+	/**
+	 * @param {Element} sceneEl
+	 * @returns {NodeListOf<Element>}
+	 */
+	getRunningApps(sceneEl = null) {
+		return (sceneEl || document).querySelectorAll('[vrapp]');
+	}
+
+	/**
+	 * @param {Element} sceneEl
+	 */
+	killAll(sceneEl = null) {
+		for (let appEl of this.getRunningApps(sceneEl)) {
+			appEl.parentNode.removeChild(appEl);
+		}
+	}
 }
 
 globalThis.appManager = new AppManager();
+
+AFRAME.registerComponent('vrapp', {
+	init() {
+		/** @type {AppManager} */
+		this.appManager = null;
+		this.app = null;
+		this.el.addEventListener('app-launch', (ev) => {
+			this.appManager = ev.detail.appManager;
+			this.app = ev.detail.app;
+		}, { once: true });
+	}
+});
 
 AFRAME.registerComponent('apps-panel', {
 	schema: {},
