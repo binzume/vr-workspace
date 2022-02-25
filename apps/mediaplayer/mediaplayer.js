@@ -119,6 +119,25 @@ AFRAME.registerComponent('media-selector', {
 		this.el.addEventListener('xyresize', ev => {
 			this._byName('medialist').setAttribute('xyrect', { width: ev.detail.xyrect.width });
 		});
+		let wrapText = (str, textWidth, ctx) => {
+			let lines = [''], ln = 0;
+			for (let char of str) {
+				if (char == '\n' || ctx.measureText(lines[ln] + char).width > textWidth) {
+					lines.push('');
+					ln++;
+				}
+				if (char != '\n') {
+					lines[ln] += char;
+				}
+			}
+			return lines;
+		};
+		let formatDate = (s) => {
+			let t = new Date(s);
+			let d2 = n => ("0" + n).substr(-2);
+			return [t.getFullYear(), d2(t.getMonth() + 1), d2(t.getDate())].join("-") + " " +
+				[d2(t.getHours()), d2(t.getMinutes()), d2(t.getSeconds())].join(":");
+		};
 
 		videolist.setAdapter({
 			selector: this,
@@ -131,6 +150,8 @@ AFRAME.registerComponent('media-selector', {
 				} else {
 					el.setAttribute("xycanvas", { width: 512, height: 128 });
 				}
+				el.setAttribute('animation__mouseenter', {property: 'object3D.position.z', to: '0.1', startEvents: 'mouseenter', dur: 50});
+				el.setAttribute('animation__mouseleave', {property: 'object3D.position.z', to: '0', startEvents: 'mouseleave', dur: 200});
 				return el;
 			}, bind(position, el, data) {
 				let rect = el.components.xyrect;
@@ -141,20 +162,6 @@ AFRAME.registerComponent('media-selector', {
 				el.setAttribute("height", rect.height * 0.99);
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				el.components.xycanvas.updateTexture();
-
-				let wrapText = (str, textWidth, ctx) => {
-					let lines = [''], ln = 0;
-					for (let char of str) {
-						if (char == '\n' || ctx.measureText(lines[ln] + char).width > textWidth) {
-							lines.push('');
-							ln++;
-						}
-						if (char != '\n') {
-							lines[ln] += char;
-						}
-					}
-					return lines;
-				};
 
 				let prevSise = this.selector.itemlist.size;
 				data.get(position).then((item) => {
@@ -182,7 +189,7 @@ AFRAME.registerComponent('media-selector', {
 						if (item.updatedTime) {
 							ctx.font = "18px sans-serif";
 							ctx.fillStyle = "white";
-							ctx.fillText(item.updatedTime.substr(0, 16), 0, thumbH + 64);
+							ctx.fillText(formatDate(item.updatedTime), 0, thumbH + 64);
 						}
 					} else {
 						ctx.font = "20px bold sans-serif";
@@ -192,7 +199,7 @@ AFRAME.registerComponent('media-selector', {
 						if (item.updatedTime) {
 							ctx.font = "18px sans-serif";
 							ctx.fillStyle = "white";
-							ctx.fillText(item.updatedTime.substr(0, 16), 210, 50);
+							ctx.fillText(formatDate(item.updatedTime), 210, 50);
 						}
 					}
 					el.components.xycanvas.updateTexture();
@@ -443,7 +450,7 @@ AFRAME.registerComponent('media-player', {
 			});
 		} else {
 			dataElem = Object.assign(document.createElement("video"), {
-				autoplay: true, controls: false, loop: this.data.loop, id: "dummyid", crossOrigin: ""
+				autoplay: true, controls: false, loop: this.data.loop, id: "dummyid", crossOrigin: "", volume: 0.5
 			});
 			dataElem.addEventListener('loadeddata', ev => {
 				if (dataElem != this.mediaEl) { return; }
