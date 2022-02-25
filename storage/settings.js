@@ -11,13 +11,38 @@ let storageWrapper = new WebkitFileSystemWrapper(storageType);
 let currentStorage = 'WebkitFileSystem';
 
 
-function makeEl(tag, child, attrs) {
+function makeEl(tag, children, attrs) {
     let el = document.createElement(tag);
-    attrs && Object.assign(el, attrs);
-    child && (Array.isArray(child) ? el.append(...child) : el.append(child));
+    children && el.append(...[children].flat(999));
+    attrs instanceof Function ? attrs(el) : (attrs && Object.assign(el, attrs));
     return el;
 }
 
+function formatDate(s) {
+    let t = new Date(s);
+    if (t.getTime() <= 0) {
+        return "";
+    }
+    let d2 = n => ("0" + n).substr(-2);
+    return [t.getFullYear(), d2(t.getMonth() + 1), d2(t.getDate())].join("-") + " " +
+        [d2(t.getHours()), d2(t.getMinutes()), d2(t.getSeconds())].join(":");
+}
+
+function formatSize(size) {
+    if (size == null) {
+        return "";
+    }
+    if (size > 1024 * 1024 * 1024 * 10) {
+        return (size / (1024 * 1024 * 1024) | 0) + "GiB";
+    }
+    if (size > 1024 * 1024 * 10) {
+        return (size / (1024 * 1024) | 0) + "MiB";
+    }
+    if (size > 1024 * 10) {
+        return (size / (1024) | 0) + "KiB";
+    }
+    return size + "B"
+}
 
 async function chedckGoogleDriveStatus() {
     let statusEl = document.querySelector('#google-drive-status');
@@ -61,7 +86,7 @@ async function chedckWebkitFileSystemStatus() {
     statusEl.innerText = "Initializing WebkitFs...";
     await installWebkitFs();
 
-    statusEl.innerText = `Ok (Usage: ${quota.usedBytes} / ${quota.grantedBytes}B)`;
+    statusEl.innerText = `Ok (Usage: ${formatSize(quota.usedBytes)} / ${formatSize(quota.grantedBytes)}B)`;
 
     if (currentStorage == 'WebkitFileSystem') {
         await updateFileList();
@@ -94,7 +119,7 @@ async function updateFileList(storage, path) {
     }
 
     for (let item of list.items) {
-        let li = makeEl('li', [item.updatedTime, ' ', item.url ? makeEl('a', item.name, { href: item.url }) : item.name]);
+        let li = makeEl('li', [formatDate(item.updatedTime), ' ', item.url ? makeEl('a', item.name, { href: item.url }) : item.name, ' ', formatSize(item.size)]);
 
         if (item.remove) {
             let deleteButton = makeEl('button', 'Remove');
@@ -144,10 +169,13 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
                 return;
             }
 
+            let tasks = [];
             for (let file of inputEl.files) {
-                accessor.writeFile(file.name, file);
+                tasks.push(accessor.writeFile(file.name, file));
             }
             document.body.removeChild(inputEl);
+            updateFileList();
+            await Promise.all(tasks);
             updateFileList(); // TODO: update quata dispaly
         });
         document.body.appendChild(inputEl).click();
