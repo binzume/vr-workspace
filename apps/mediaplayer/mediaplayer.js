@@ -231,7 +231,6 @@ AFRAME.registerComponent('media-selector', {
 						image.src = item.thumbnailUrl; // TODO: cancellation
 					} else if (item.thumbnail?.fetch) {
 						(async () => {
-							console.log('fetch thumbnail for ' + item.path);
 							/** @type {Response} */
 							let r = await item.thumbnail.fetch();
 							let blob = await r.blob();
@@ -491,7 +490,9 @@ AFRAME.registerComponent('media-player', {
 		this.mediaEl = dataElem;
 
 		// @ts-ignore
-		if (!f.url && f.type.startsWith("video/mp4") && typeof MP4Player !== 'undefined') {
+		if (f.url) {
+			dataElem.src = f.url;
+		} else if (f.fetch && f.type.startsWith("video/mp4") && typeof MP4Player !== 'undefined') {
 			let options = {
 				opener: {
 					async open(pos) {
@@ -501,7 +502,7 @@ AFRAME.registerComponent('media-player', {
 			};
 			// @ts-ignore
 			new MP4Player(dataElem).setBufferedReader(new BufferedReader(options));
-		} else if (!f.url && f.fetch) {
+		} else if (f.fetch) {
 			(async () => {
 				let url = URL.createObjectURL(await (await f.fetch()).blob())
 				dataElem.addEventListener('load', (ev) => {
@@ -509,8 +510,6 @@ AFRAME.registerComponent('media-player', {
 				}, { once: true });
 				dataElem.src = url;
 			})();
-		} else {
-			dataElem.src = f.url;
 		}
 
 		this.touchToPlay = false;
@@ -611,7 +610,10 @@ AFRAME.registerComponent('media-player', {
 	},
 	_removeMediaEl() {
 		if (this.mediaEl) {
-			this.mediaEl.src = null;
+			if (this.mediaEl.tagName == 'VIDEO') {
+				// VIDEO: stop loading. IMG: element may be cached and reused in A-Frame??
+				this.mediaEl.src = null;
+			}
 			this.mediaEl.parentNode.removeChild(this.mediaEl);
 			this.mediaEl = null;
 		}
