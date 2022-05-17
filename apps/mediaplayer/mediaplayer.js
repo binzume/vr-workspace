@@ -134,7 +134,7 @@ AFRAME.registerComponent('media-selector', {
 		};
 		let formatDate = (s) => {
 			let t = new Date(s);
-			let d2 = n => ("0" + n).substr(-2);
+			let d2 = n => (n > 9 ? "" : "0") + n;
 			return [t.getFullYear(), d2(t.getMonth() + 1), d2(t.getDate())].join("-") + " " +
 				[d2(t.getHours()), d2(t.getMinutes()), d2(t.getSeconds())].join(":");
 		};
@@ -150,8 +150,8 @@ AFRAME.registerComponent('media-selector', {
 				} else {
 					el.setAttribute("xycanvas", { width: 512, height: 128 });
 				}
-				el.setAttribute('animation__mouseenter', {property: 'object3D.position.z', to: '0.1', startEvents: 'mouseenter', dur: 50});
-				el.setAttribute('animation__mouseleave', {property: 'object3D.position.z', to: '0', startEvents: 'mouseleave', dur: 200});
+				el.setAttribute('animation__mouseenter', { property: 'object3D.position.z', to: '0.1', startEvents: 'mouseenter', dur: 50 });
+				el.setAttribute('animation__mouseleave', { property: 'object3D.position.z', to: '0', startEvents: 'mouseleave', dur: 200 });
 				return el;
 			}, bind(position, el, data) {
 				let rect = el.components.xyrect;
@@ -221,21 +221,38 @@ AFRAME.registerComponent('media-selector', {
 						el.components.xycanvas.updateTexture();
 					};
 
-					if (!item.thumbnailUrl) {
+					if (item.thumbnailUrl) {
+						let image = new Image();
+						image.crossOrigin = "anonymous";
+						image.referrerPolicy = "origin-when-cross-origin";
+						image.onload = function () {
+							drawThumbnail(image);
+						};
+						image.src = item.thumbnailUrl; // TODO: cancellation
+					} else if (item.thumbnail?.fetch) {
+						(async () => {
+							console.log('fetch thumbnail for ' + item.path);
+							/** @type {Response} */
+							let r = await item.thumbnail.fetch();
+							let blob = await r.blob();
+							let objectUrl = URL.createObjectURL(blob);
+							let image = new Image();
+							image.onload = function () {
+								drawThumbnail(image);
+								URL.revokeObjectURL(objectUrl);
+							};
+							image.onerror = (ev) => {
+								URL.revokeObjectURL(objectUrl);
+							};
+							image.src = objectUrl;
+						})();
+					} else {
 						if (item.type == 'folder' || item.type == 'list') {
 							drawThumbnail(document.querySelector('#mediaplayer-icon-folder'));
 						} else {
 							drawThumbnail(document.querySelector('#mediaplayer-icon-file'));
 						}
-						return;
 					}
-					let image = new Image();
-					image.crossOrigin = "anonymous";
-					image.referrerPolicy = "origin-when-cross-origin";
-					image.onload = function () {
-						drawThumbnail(image);
-					};
-					image.src = item.thumbnailUrl;
 				});
 			}
 		});
@@ -285,8 +302,10 @@ AFRAME.registerComponent('media-selector', {
 		this._byName('parent-button').addEventListener('click', (ev) => {
 			if (this.itemlist.getParentPath) {
 				let parent = this.itemlist.getParentPath();
-				if (parent) {
+				if (parent != null) {
 					this._openList(this.data.storage, parent);
+				} else {
+					this.el.setAttribute("media-selector", { path: '', storage: '_dummy_' });
 				}
 			}
 		});
@@ -467,7 +486,7 @@ AFRAME.registerComponent('media-player', {
 
 		// replace
 		var parent = (this.mediaEl || document.querySelector(this.data.loadingSrc)).parentNode;
-		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
+		this._removeMediaEl();
 		parent.appendChild(dataElem);
 		this.mediaEl = dataElem;
 
@@ -586,9 +605,16 @@ AFRAME.registerComponent('media-player', {
 		// @ts-ignore
 		this.system.unregisterPlayer(this);
 		this.screen.removeAttribute("material"); // to avoid texture leaks.
-		if (this.mediaEl) this.mediaEl.parentNode.removeChild(this.mediaEl);
+		this._removeMediaEl();
 		this.el.removeEventListener('click', this.onclicked);
 		this.setStereoMode(0);
+	},
+	_removeMediaEl() {
+		if (this.mediaEl) {
+			this.mediaEl.src = null;
+			this.mediaEl.parentNode.removeChild(this.mediaEl);
+			this.mediaEl = null;
+		}
 	}
 });
 
