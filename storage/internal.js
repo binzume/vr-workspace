@@ -136,7 +136,10 @@ class ItemList extends BaseFileList {
         }
     }
     getParentPath() {
-        return this.itemPath.replace(/\/[^/]+$/, '');
+        if (this.itemPath == '' || this.itemPath == '/') {
+            return null;
+        }
+        return this.itemPath.substring(0, this.itemPath.lastIndexOf('/'));
     }
     _getOrNull(position) {
         let page = position / this._pageSize | 0;
@@ -265,6 +268,13 @@ class StorageList extends BaseFileList {
         this._update();
         this.notifyUpdate();
     }
+    removeStorage(id) {
+        if (!this.accessors[id]) { return false; }
+        delete this.accessors[id];
+        this._update();
+        this.notifyUpdate();
+        return true;
+    }
     get(position) {
         return Promise.resolve(this.items[position]);
     }
@@ -288,7 +298,10 @@ export async function install() {
         set: function (obj, prop, value) {
             storageList.addStorage(prop, value);
             return true;
-        }
+        },
+        deleteProperty: function (t, key) {
+            return storageList.removeStorage(key);
+        },
     });
     // @ts-ignore
     globalThis.storageList = storageList;
