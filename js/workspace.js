@@ -253,51 +253,32 @@ class AppManager {
 				script.id = id;
 			}
 		}
-		if (script.src) {
-			await this._loadModule(script.src, script.id);
-		} else {
-			if (script.innerText != "" && (script.type == "text/javascript" || script.type == "")) {
-				this._execScript(script.innerText, script.id, srcUrl);
+		let dedup = (s) => {
+			if (!s) { return true; }
+			if (this.loadedModules.has(s)) { return false; }
+			this.loadedModules.add(s);
+			return true;
+		}
+		if (script.type == 'importmap') { return; }
+		if (!dedup(script.id) || !dedup(script.src) || (script.id && document.getElementById(script.id))) { return; }
+		await new Promise((resolve, reject) => {
+			/** @type {HTMLScriptElement} */
+			// @ts-ignore
+			let el = document.createElement('script'); // TODO: document.importNode(script, true);
+			for (let attr of script.attributes) {
+				attr.nodeName != 'src' && el.setAttribute(attr.nodeName, attr.nodeValue);
 			}
-		}
-	}
-
-	/**
-	 * 
-	 * @param {string} src 
-	 * @param {string} [id] 
-	 */
-	async _loadModule(src, id) {
-		if (id) {
-			if (this.loadedModules.has(id)) {
-				return;
+			el.innerHTML = script.innerHTML;
+			if (script.src) {
+				el.onload = resolve;
+				el.onerror = reject;
+				el.src = script.src;
+				document.querySelector('head').append(el);
+			} else {
+				document.querySelector('head').append(el);
+				resolve();
 			}
-			this.loadedModules.add(id);
-		}
-		if (!this.loadedModules.has(src)) {
-			this.loadedModules.add(src);
-			await import(src);
-		}
-	}
-
-	/**
-	 * 
-	 * @param {string} code
-	 * @param {string} [id] 
-	 * @param {string} [srcUrl] 
-	 */
-	async _execScript(code, id, srcUrl) {
-		if (id) {
-			if (this.loadedModules.has(id)) {
-				return;
-			}
-			this.loadedModules.add(id);
-		}
-		try {
-			eval(code)
-		} catch (e) {
-			console.error("error while executing embedded script: ", srcUrl, e);
-		}
+		});
 	}
 
 	/**
