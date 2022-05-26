@@ -8,19 +8,65 @@
   <script id="script-aframe" src="https://binzume.github.io/aframe/dist/aframe-master.min.js"></script>
   <script id="script-xylayout" src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
   <script id="script-celestial-sphere" src="https://binzume.github.io/webvr-skymap/js/celestial-sphere.js"></script>
+  <script id="script-skymap" src="skymap.js"></script>
 </head>
 
 <body style="background-color: black; color:white;">
+
+  <script id="starrysky-menu-tempalte" type="text/html">
+    <a-xywindow starrysky-menu scale='0.2 0.2 0.2' position="-1.5 1 -3" title="Menu" width="4.5" height="0.6" xycontainer="direction:column;spacing:0.05;alignItems:stretch">
+      <a-xycontainer height="0.6" direction="row" justify-items="stretch" spacing="0.05">
+        <a-xybutton name="selector" width="1" height="0.6" label="&#x271B;">
+        </a-xybutton>
+        <a-xybutton name="constellations" width="1.2" height="0.6" label="&#x264b;">
+        </a-xybutton>
+        <a-xybutton name="drawgrid" width="1.2" height="0.6" label="&#x1F310;&#xFE0E;">
+        </a-xybutton>
+        <a-xybutton name="drawsol" width="1.2" height="0.6" label="&#x2600;">
+        </a-xybutton>
+        <a-xybutton name="openConfigButton" width="1" height="0.6" label="&#x2699;">
+        </a-xybutton>
+      </a-xycontainer>
+      <a-xycontainer height="1.2" direction="row" justify-items="stretch" spacing="0.05">
+        <a-xycontainer width="3.3" height="1.2" direction="column" justify-items="stretch">
+          <a-xycontainer width="3.3" height="0.4" direction="row" justify-items="stretch" align-items="stretch" spacing="0.05">
+            <a-xybutton name="time-uy" label="&#x25B2;" width="0.8" height="0.6"></a-xybutton>
+            <a-xybutton name="time-um" label="&#x25B2;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-ud" label="&#x25B2;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-uh" label="&#x25B2;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-ui" label="&#x25B2;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-us" label="&#x25B2;" width="0.5" height="0.6"></a-xybutton>
+          </a-xycontainer>
+          <a-xylabel name="time-text" width="3.3" height="0.5" value="0000-00-00 00:00:00" wrap-count="17"></a-xylabel>
+          <a-xycontainer width="3.3" height="0.4" direction="row" justify-items="stretch" align-items="stretch" spacing="0.05">
+            <a-xybutton name="time-dy" label="&#x25BC;" width="0.8" height="0.6"></a-xybutton>
+            <a-xybutton name="time-dm" label="&#x25BC;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-dd" label="&#x25BC;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-dh" label="&#x25BC;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-di" label="&#x25BC;" width="0.5" height="0.6"></a-xybutton>
+            <a-xybutton name="time-ds" label="&#x25BC;" width="0.5" height="0.6"></a-xybutton>
+          </a-xycontainer>
+        </a-xycontainer>
+        <a-xycontainer height="1.2" width="1.2" direction="column" justify-items="stretch" align-items="stretch" spacing="0.05">
+          <a-xyselect name="speed" values="x1.0,x60,x300,x3600,x0" width="1" height="0.6" xybutton></a-xyselect>
+          <a-xybutton name="time-now" label="Now" width="0.8" height="0.6"></a-xybutton>
+        </a-xycontainer>
+      </a-xycontainer>
+    </a-xywindow>
+  </script>
+
   <a-scene fog="type: linear; color: #000; near:10;far:50;" background="color:black" renderer="antialias:true;">
     <a-entity  cursor="rayOrigin: mouse; fuse:false" raycaster="far:Infinity;objects:.collidable"></a-entity>
 
     <a-entity id="env">
-      <a-entity celestial-sphere="src:https://binzume.github.io/webvr-skymap/data/hip_stars.json?;updateIntervalMs:100;speed:1"></a-entity>
+      <a-entity celestial-sphere="src:https://binzume.github.io/webvr-skymap/data/hip_stars.json?;starNameSrc:https://binzume.github.io/webvr-skymap/data/star_names.json;constellationSrc:https://binzume.github.io/webvr-skymap/data/hip_constellations.json;updateIntervalMs:100;speed:1"></a-entity>
       <a-plane id='ground' wireframe='true' width='10' height='10' segments-height='10' segments-width='10' rotation='-90 0 0' color="#111144"></a-plane>
       <a-xylabel value="S" width="0.6" height="1" wrap-count="1.5" align="center" position='0 0.01 -2' rotation='-90 0 0'  color="#444444"></a-xylabel>
       <a-xylabel value="N" width="0.6" height="1" wrap-count="1.5" align="center" position='0 0.01 2' rotation='-90 0 180' color="#441111"></a-xylabel>
-      <a-xylabel value="W" width="0.6" height="1" wrap-count="1.5" align="center" position='-2 0.01 0' rotation='-90 0 90' color="#444444"></a-xylabel>
-      <a-xylabel value="E" width="0.6" height="1" wrap-count="1.5" align="center" position='2 0.01 0' rotation='-90 0 -90' color="#444444"></a-xylabel>
+      <a-xylabel value="E" width="0.6" height="1" wrap-count="1.5" align="center" position='-2 0.01 0' rotation='-90 0 90' color="#444444"></a-xylabel>
+      <a-xylabel value="W" width="0.6" height="1" wrap-count="1.5" align="center" position='2 0.01 0' rotation='-90 0 -90' color="#444444"></a-xylabel>
+
+      <a-sphere color="#333333" radius="0.2" class="collidable" instantiate-on-click="template:starrysky-menu-tempalte;id:starrysky-menu"></a-sphere>
     </a-entity>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;axismove:rotation" >
