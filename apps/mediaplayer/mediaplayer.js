@@ -50,7 +50,7 @@ AFRAME.registerComponent('xylist-grid-layout', {
 		this.update = this.update.bind(this);
 		this.el.addEventListener('xyresize', this.update);
 	},
-	update() {
+	update(oldData) {
 		let data = this.data;
 		let xylist = this.el.components.xylist;
 		let xyrect = this.el.components.xyrect;
@@ -85,7 +85,12 @@ AFRAME.registerComponent('xylist-grid-layout', {
 				el.setAttribute("position", { x: x + pivot.x * itemWidth, y: y - pivot.y * itemHeight, z: 0 });
 			}
 		});
-		xylist.setViewport([0, 0, 0, 0]);
+		if (containerWidth !== this._containerWidth || itemWidth != this._itemWidth) {
+			// force relayout.
+			this._containerWidth = containerWidth;
+			this._itemWidth = itemWidth;
+			xylist.setViewport([0, 0, 0, 0]);
+		}
 	}
 });
 
@@ -163,13 +168,9 @@ AFRAME.registerComponent('media-selector', {
 				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				el.components.xycanvas.updateTexture();
 
-				let prevSise = this.selector.itemlist.size;
 				data.get(position).then((item) => {
 					if (el.dataset.listPosition != position || item == null) {
 						return;
-					}
-					if (this.selector.itemlist.size != prevSise) {
-						videolist.setContents(this.selector.itemlist, this.selector.itemlist.size); // update size
 					}
 
 					let thumbW = 200, thumbH = 128;
@@ -236,11 +237,11 @@ AFRAME.registerComponent('media-selector', {
 							let blob = await r.blob();
 							let objectUrl = URL.createObjectURL(blob);
 							let image = new Image();
-							image.onload = function () {
+							image.onload = (_ev) => {
 								drawThumbnail(image);
 								URL.revokeObjectURL(objectUrl);
 							};
-							image.onerror = (ev) => {
+							image.onerror = (_ev) => {
 								URL.revokeObjectURL(objectUrl);
 							};
 							image.src = objectUrl;
@@ -352,7 +353,7 @@ AFRAME.registerComponent('media-selector', {
 			this.item.thumbnailUrl = this.itemlist.thumbnailUrl;
 			mediaList.setContents(this.itemlist, this.itemlist.size);
 			this.itemlist.onupdate = () => {
-				mediaList.setContents(this.itemlist, this.itemlist.size);
+				setTimeout(() => mediaList.setContents(this.itemlist, this.itemlist.size, false), 0);
 			};
 			this.el.setAttribute("title", this.item.name);
 		});
@@ -374,6 +375,8 @@ AFRAME.registerComponent('media-player', {
 		screen: { default: ".screen" }
 	},
 	init() {
+		let el = this.el;
+		el.setAttribute('tabindex', 0); // allow focus
 		this.loadingTimer = null;
 		this.screen = this.el.querySelector(this.data.screen);
 		this.touchToPlay = false;
@@ -383,13 +386,16 @@ AFRAME.registerComponent('media-player', {
 		this.system.registerPlayer(this);
 
 		// @ts-ignore
-		this.onclicked = ev => this.system.selectPlayer(this);
-		this.el.addEventListener('click', this.onclicked);
+		this.onclicked = ev => {
+			this.el.focus();
+			this.system.selectPlayer(this);
+		}
+		el.addEventListener('click', this.onclicked);
 		this.screen.addEventListener('click', ev => this.togglePause());
 		this.stereoMode = 0;
 
 		let mediaController = this.data.mediaController;
-		this.el.querySelectorAll("[" + mediaController + "]").forEach(controller => {
+		el.querySelectorAll("[" + mediaController + "]").forEach(controller => {
 			controller.components[mediaController].setMediaPlayer(this);
 		});
 
@@ -504,7 +510,7 @@ AFRAME.registerComponent('media-player', {
 			new MP4Player(dataElem).setBufferedReader(new BufferedReader(options));
 		} else if (f.fetch) {
 			(async () => {
-				let url = URL.createObjectURL(await (await f.fetch()).blob())
+				let url = URL.createObjectURL(await (await f.fetch()).blob());
 				dataElem.addEventListener('load', (ev) => {
 					URL.revokeObjectURL(url);
 				}, { once: true });
@@ -522,6 +528,7 @@ AFRAME.registerComponent('media-player', {
 			}
 		}
 		this.setStereoMode(this.stereoMode);
+		this.el.focus();
 	},
 	async movePos(d) {
 		if (!this.listCursor) {
@@ -640,10 +647,10 @@ AFRAME.registerSystem('media-player', {
 		});
 		setTimeout(() => {
 			document.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('bbuttondown', ev => {
-				if (this.currentPlayer) this.currentPlayer.movePos(-1);
+				if (this.currentPlayer && this.currentPlayer.el == document.activeElement) this.currentPlayer.movePos(-1);
 			}));
 			document.querySelectorAll('[laser-controls]').forEach(el => el.addEventListener('abuttondown', ev => {
-				if (this.currentPlayer) this.currentPlayer.movePos(1);
+				if (this.currentPlayer && this.currentPlayer.el == document.activeElement) this.currentPlayer.movePos(1);
 			}));
 		}, 0);
 	},
