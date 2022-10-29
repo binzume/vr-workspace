@@ -11,7 +11,7 @@
 </head>
 
 <body style="background-color: black; color:white;">
-  <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable,a-rounded;far:5500" renderer="antialias: true;">
+  <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable;far:5500" renderer="antialias: true;">
     <a-assets>
       <img id="mediaplayer-icons" src="images/icons.png" />
       <img id="mediaplayer-icon-folder" src="images/icon_folder.png" />
@@ -19,7 +19,7 @@
       <img id="mediaplayer-loading" src="images/loading.png" />
     </a-assets>
 
-    <a-xywindow id="media-player-template" media-player xyresize="minWidth:10" scale='0.2 0.2 0.2' width="10" height="6" position="0 1 -4" xy-drag-control="draggable:.screen;autoRotate:true" xycontainer="direction:column">
+    <a-xywindow id="media-player-template" media-player xyresize="minWidth:6" scale='0.2 0.2 0.2' width="12" height="8" position="0 1.2 -2.5" xy-drag-control="draggable:.screen;autoRotate:true" xycontainer="direction:column">
       <a-video class="screen" width="10" height="6" src="#mediaplayer-loading" material="npot:true;shader: flat;"></a-video>
       <a-entity xyrect="height:0">
       <a-xycontainer direction="column" media-controller width="8" height="2" position="0 1.1 0.05">
@@ -66,8 +66,8 @@
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
       <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
-      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable,.clickable,a-rounded" line="color: #3060a0; opacity: 0.5"></a-entity>
-      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable,.clickable,a-rounded" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects:.collidable"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="objects:.collidable"></a-entity>
     </a-entity>
 
   </a-scene>

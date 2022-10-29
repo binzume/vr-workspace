@@ -116,7 +116,7 @@ AFRAME.registerComponent('media-selector', {
 				// TODO: parse args
 				let p = ev.detail.args.split(/\/(.*)/);
 				if (p.length >= 2) {
-					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updated', sortOrder: 'd' });
+					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updatedTime', sortOrder: 'd' });
 				}
 			}
 		}, { once: true });
@@ -310,9 +310,9 @@ AFRAME.registerComponent('media-selector', {
 			}
 		});
 
-		this._byName('sort-option').setAttribute('values', ["Name", "Update", "Size"].join(","));
+		this._byName('sort-option').setAttribute('values', ["Name", "Update", "Size", "Type"].join(","));
 		this._byName('sort-option').addEventListener('change', (ev) => {
-			let field = ["name", "updated", "size"][ev.detail.index];
+			let field = ["name", "updatedTime", "size", "type"][ev.detail.index];
 			let order = (this.data.sortField == field && this.data.sortOrder == "a") ? "d" : "a";
 			this.el.setAttribute("media-selector", { sortField: field, sortOrder: order });
 		});
@@ -370,8 +370,8 @@ AFRAME.registerComponent('media-player', {
 		playbackRate: { default: 1.0 },
 		loadingSrc: { default: "#mediaplayer-loading" },
 		mediaController: { default: "media-controller" },
-		maxWidth: { default: 16 },
-		maxHeight: { default: 16 },
+		maxWidth: { default: 12 },
+		maxHeight: { default: 10 },
 		screen: { default: ".screen" }
 	},
 	init() {
@@ -619,7 +619,7 @@ AFRAME.registerComponent('media-player', {
 		if (this.mediaEl) {
 			if (this.mediaEl.tagName == 'VIDEO') {
 				// VIDEO: stop loading. IMG: element may be cached and reused in A-Frame??
-				this.mediaEl.src = null;
+				this.mediaEl.src = '';
 			}
 			this.mediaEl.parentNode.removeChild(this.mediaEl);
 			this.mediaEl = null;
@@ -897,9 +897,16 @@ AFRAME.registerGeometry('cubemapbox', {
 			new THREE.Vector2(d, 1.0 / 3),
 		]];
 		let geometry = new THREE.BoxGeometry(data.width, data.height, data.depth);
+		let uvattr = geometry.getAttribute('uv');
 		for (let i = 0; i < 6; i++) {
-			geometry.faceVertexUvs[0][i * 2] = [uv[i][0], uv[i][1], uv[i][3]];
-			geometry.faceVertexUvs[0][i * 2 + 1] = [uv[i][1], uv[i][2], uv[i][3]];
+			if (geometry.faceVertexUvs) {
+				geometry.faceVertexUvs[0][i * 2] = [uv[i][0], uv[i][1], uv[i][3]];
+				geometry.faceVertexUvs[0][i * 2 + 1] = [uv[i][1], uv[i][2], uv[i][3]];
+			} else {
+				[uv[i][0], uv[i][3], uv[i][1], uv[i][2]].forEach((v, j) => {
+					v.toArray(uvattr.array, i * 8 + j * 2);
+				});	
+			}
 		}
 		this.geometry = geometry;
 	}
