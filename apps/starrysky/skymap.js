@@ -1,26 +1,18 @@
 "use strict";
 
-async function instantiate(id, parent) {
-	let template = document.getElementById(id);
-	let wrapper = document.createElement('div');
-	wrapper.innerHTML = template.innerHTML;
-	var el = wrapper.firstElementChild;
-	(parent || document.querySelector('a-scene')).appendChild(el);
-	return el;
-}
-
 AFRAME.registerComponent('instantiate-on-click', {
 	schema: {
-		template: { type: 'string', default: '' },
-		id: { type: 'string', default: '' }
+		template: { default: '' },
+		id: { default: '' },
+		event: { default: 'click' },
 	},
 	init() {
-		this.el.addEventListener('click', async (ev) => {
+		this.el.addEventListener(this.data.event, async (ev) => {
 			if (this.data.id && document.getElementById(this.data.id)) {
 				this._updateRotation(document.getElementById(this.data.id));
 				return;
 			}
-			let el = await instantiate(this.data.template);
+			let el = await this.instantiate(document.getElementById(this.data.template));
 			if (this.data.id) {
 				el.id = this.data.id;
 			}
@@ -40,32 +32,20 @@ AFRAME.registerComponent('instantiate-on-click', {
 			}, { once: true });
 		});
 	},
-	_updateRotation(el) {
-		let cameraPosition = el.sceneEl.camera.getWorldPosition(new THREE.Vector3());
-		let targetPosition = el.object3D.getWorldPosition(new THREE.Vector3());
-		let tr = new THREE.Matrix4().lookAt(cameraPosition, targetPosition, new THREE.Vector3(0, 1, 0));
-		el.object3D.setRotationFromMatrix(tr);
-	}
-});
-
-AFRAME.registerComponent('sky-pointer', {
-	schema: {
-		event: { default: "gripdown" },
-		lineColor: { default: '#3060a0' }
+	async instantiate(template, parent = null) {
+		let wrapper = document.createElement('div');
+		wrapper.innerHTML = ['SCRIPT', 'TEMPLATE'].includes(template.tagName) ? template.innerHTML : template.outerHTML;
+		let el = wrapper.firstElementChild;
+		(parent || this.el.sceneEl).appendChild(el);
+		return el;
 	},
-	init: function () {
-		let sphereEl = document.querySelector("[celestial-sphere]");
-		let component = 'celestial-cursor';
-		this.el.addEventListener(this.data.event, ev => {
-			let c = sphereEl.getAttribute(component);
-			if (!c || c.raycaster != this.el) {
-				sphereEl.setAttribute(component, { raycaster: this.el });
-				this.el.setAttribute('line', { color: '#3050b0' });
-			} else {
-				sphereEl.removeAttribute(component);
-				this.el.setAttribute('line', { color: this.data.lineColor });
-			}
-		});
+	_updateRotation(el) {
+		let camPos = new THREE.Vector3();
+		let camRot = new THREE.Quaternion();
+		this.el.sceneEl.camera.matrixWorld.decompose(camPos, camRot, new THREE.Vector3());
+		let targetPosition = el.object3D.getWorldPosition(new THREE.Vector3());
+		let tr = new THREE.Matrix4().lookAt(camPos, targetPosition, new THREE.Vector3(0, 1, 0));
+		el.object3D.setRotationFromMatrix(tr);
 	}
 });
 
@@ -73,73 +53,73 @@ AFRAME.registerComponent('starrysky-menu', {
 	schema: {
 	},
 	init() {
-		let sphereEl = document.querySelector("[celestial-sphere]");
+		this.sphereEl = this.el.sceneEl.querySelector("[celestial-sphere]");
 		this.timer = setInterval(() => this._refreshTime(), 1000);
 		this._byName('constellations').addEventListener('click', (e) => {
-			let v = !sphereEl.getAttribute("celestial-sphere").constellation;
-			sphereEl.setAttribute("celestial-sphere", "constellation", v);
+			let v = !this.sphereEl.getAttribute("celestial-sphere").constellation;
+			this.sphereEl.setAttribute("celestial-sphere", "constellation", v);
 			this._byName('constellations').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
 		});
 		this._byName('drawgrid').addEventListener('click', (e) => {
-			let v = !sphereEl.getAttribute("celestial-sphere").grid;
-			sphereEl.setAttribute("celestial-sphere", "grid", v);
+			let v = !this.sphereEl.getAttribute("celestial-sphere").grid;
+			this.sphereEl.setAttribute("celestial-sphere", "grid", v);
 			this._byName('drawgrid').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
-			if (sphereEl.components['celestial-sphere'].constellationBounds) sphereEl.components['celestial-sphere'].constellationBounds.visible = v;
+			if (this.sphereEl.components['celestial-sphere'].constellationBounds) this.sphereEl.components['celestial-sphere'].constellationBounds.visible = v;
 		});
 		this._byName('drawsol').addEventListener('click', (e) => {
-			let v = !sphereEl.getAttribute("celestial-sphere").solarsystem;
-			sphereEl.setAttribute("celestial-sphere", "solarsystem", v);
+			let v = !this.sphereEl.getAttribute("celestial-sphere").solarsystem;
+			this.sphereEl.setAttribute("celestial-sphere", "solarsystem", v);
 			this._byName('drawsol').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
 		});
 		this._byName('speed').addEventListener('change', ev => {
-			sphereEl.setAttribute("celestial-sphere", "speed", [1, 60, 300, 3600, 0][ev.detail.index]);
+			this.sphereEl.setAttribute("celestial-sphere", "speed", [1, 60, 300, 3600, 0][ev.detail.index]);
 		});
 		this._byName('time-now').addEventListener('click', (e) => {
-			sphereEl.setAttribute("celestial-sphere", "timeMs", Date.now());
+			this.sphereEl.setAttribute("celestial-sphere", "timeMs", Date.now());
 		});
 		this._byName('time-uy').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setFullYear(d.getFullYear() + 1));
+			this._modifyTime(this.sphereEl, d => d.setFullYear(d.getFullYear() + 1));
 		});
 		this._byName('time-dy').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setFullYear(d.getFullYear() - 1));
+			this._modifyTime(this.sphereEl, d => d.setFullYear(d.getFullYear() - 1));
 		});
 		this._byName('time-um').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setMonth(d.getMonth() + 1));
+			this._modifyTime(this.sphereEl, d => d.setMonth(d.getMonth() + 1));
 		});
 		this._byName('time-dm').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setMonth(d.getMonth() - 1));
+			this._modifyTime(this.sphereEl, d => d.setMonth(d.getMonth() - 1));
 		});
 		this._byName('time-ud').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setDate(d.getDate() + 1));
+			this._modifyTime(this.sphereEl, d => d.setDate(d.getDate() + 1));
 		});
 		this._byName('time-dd').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setDate(d.getDate() - 1));
+			this._modifyTime(this.sphereEl, d => d.setDate(d.getDate() - 1));
 		});
 		this._byName('time-uh').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setHours(d.getHours() + 1));
+			this._modifyTime(this.sphereEl, d => d.setHours(d.getHours() + 1));
 		});
 		this._byName('time-dh').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setHours(d.getHours() - 1));
+			this._modifyTime(this.sphereEl, d => d.setHours(d.getHours() - 1));
 		});
 		this._byName('time-ui').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setMinutes(d.getMinutes() + 1));
+			this._modifyTime(this.sphereEl, d => d.setMinutes(d.getMinutes() + 1));
 		});
 		this._byName('time-di').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setMinutes(d.getMinutes() - 1));
+			this._modifyTime(this.sphereEl, d => d.setMinutes(d.getMinutes() - 1));
 		});
 		this._byName('time-us').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setSeconds(d.getSeconds() + 1));
+			this._modifyTime(this.sphereEl, d => d.setSeconds(d.getSeconds() + 1));
 		});
 		this._byName('time-ds').addEventListener('click', (e) => {
-			this._modifyTime(sphereEl, d => d.setSeconds(d.getSeconds() - 1));
+			this._modifyTime(this.sphereEl, d => d.setSeconds(d.getSeconds() - 1));
 		});
 		this._byName('selector').addEventListener('click', ev => {
 			let component = 'celestial-cursor';
-			let v = !sphereEl.hasAttribute(component);
+			let v = !this.sphereEl.hasAttribute(component);
 			if (v) {
-				sphereEl.setAttribute(component, { raycaster: ev.detail.cursorEl });
+				this.sphereEl.setAttribute(component, { raycaster: ev.detail.cursorEl });
 			} else {
-				sphereEl.removeAttribute(component);
+				this.sphereEl.removeAttribute(component);
 			}
 			this._byName('selector').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
 		});
@@ -147,14 +127,18 @@ AFRAME.registerComponent('starrysky-menu', {
 	remove() {
 		clearInterval(this.timer);
 	},
-	_modifyTime(sphereEl, f) {
+	_modifyTime(sphereEl, modifyFn) {
 		let d = new Date(sphereEl.getAttribute("celestial-sphere").timeMs);
-		f(d);
+		modifyFn(d);
 		sphereEl.setAttribute("celestial-sphere", "timeMs", d.getTime());
 		this._refreshTime();
 	},
 	_refreshTime() {
-		let t = new Date(document.querySelector("[celestial-sphere]").getAttribute("celestial-sphere").timeMs);
+		this.sphereEl = this.el.sceneEl.querySelector("[celestial-sphere]");
+		if (this.sphereEl == null) {
+			this._byName('time-text').setAttribute("value", '-----------------');
+		}
+		let t = new Date(this.sphereEl.getAttribute("celestial-sphere").timeMs);
 		let d2 = n => ("0" + n).substr(-2);
 		let timeStr = [t.getFullYear(), d2(t.getMonth() + 1), d2(t.getDate())].join("-") + " " +
 			[d2(t.getHours()), d2(t.getMinutes()), d2(t.getSeconds())].join(":");
@@ -170,7 +154,7 @@ AFRAME.registerComponent('celestial-cursor', {
 		raycaster: { type: 'selector', default: "[raycaster]" }
 	},
 	init() {
-		let sphereEl = document.querySelector('[celestial-sphere]');
+		let sphereEl = this.el.sceneEl.querySelector('[celestial-sphere]');
 		this.sphere = sphereEl.components['celestial-sphere'];
 		this.orgconstellation = this.sphere.data.constellation;
 		this.balloonEl = document.createElement('a-entity');
@@ -223,9 +207,10 @@ AFRAME.registerComponent('celestial-cursor', {
 		this.balloonEl.object3D.position.copy(ray.origin.clone().add(ray.direction.clone().multiplyScalar(10)));
 		this.balloonEl.object3D.lookAt(ray.origin);
 	},
-	remove: function () {
+	remove() {
 		this.el.sceneEl.removeChild(this.balloonEl);
 		this.sphere.selectConstellation(null);
+		this.sphere.clearCursor();
 		this.sphere.el.setAttribute('celestial-sphere', 'constellation', this.orgconstellation);
 	}
 });
