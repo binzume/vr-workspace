@@ -315,7 +315,7 @@ AFRAME.registerComponent('vrapp', {
 
 AFRAME.registerComponent('apps-panel', {
 	schema: {},
-	init: function () {
+	init() {
 		this._elByName('close-button').addEventListener('click', (ev) => {
 			this.el.parentNode.removeChild(this.el);
 		});
@@ -371,7 +371,7 @@ AFRAME.registerComponent('apps-panel', {
 
 AFRAME.registerComponent('main-menu', {
 	schema: {},
-	init: function () {
+	init() {
 		this._elByName('exitVRButton').addEventListener('click', (ev) => {
 			this.el.sceneEl.exitVR();
 		});
@@ -445,7 +445,7 @@ AFRAME.registerComponent('camera-control', {
 		let rotation = new THREE.Euler(0, 0, 0, 'YXZ');
 		let distance = lookAt.clone().sub(this.el.getAttribute('position')).length();
 		let updateCamera = () => {
-			if (this.el.sceneEl.is('vr-mode')) {
+			if (this.el.sceneEl.is('vr-mode') || this.el.sceneEl.is('ar-mode')) {
 				return;
 			}
 			let cameraObj = this.el.object3D;
@@ -632,7 +632,7 @@ AFRAME.registerComponent('window-locator', {
 			let cameraRigEl = document.querySelector('#camera-rig');
 			let base = new THREE.Vector3();
 			cameraRigEl && cameraRigEl.object3D.getWorldPosition(base);
-			if (el.sceneEl.is('vr-mode')) {
+			if (el.sceneEl.is('vr-mode') || el.sceneEl.is('ar-mode')) {
 				pos.set(0, 0, pos.z).applyMatrix4(el.sceneEl.camera.matrixWorld);
 			} else {
 				let camPos = new THREE.Vector3();
@@ -656,7 +656,7 @@ AFRAME.registerComponent('window-locator', {
 			pos.add(d);
 		}
 
-		if (el.sceneEl.is('vr-mode') && this.data.updateRotation) {
+		if ((el.sceneEl.is('vr-mode') || el.sceneEl.is('ar-mode')) && this.data.updateRotation) {
 			this.updateRotation();
 		}
 	},
@@ -696,7 +696,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 			let pos = ev.detail.center.clone().normalize().multiplyScalar(distance).applyMatrix4(tr);
 
 			menu.setAttribute('position', pos);
-			if (sceneEl.is('vr-mode')) {
+			if (sceneEl.is('vr-mode') || sceneEl.is('ar-mode')) {
 				let cameraPosition = new THREE.Vector3();
 				let cameraQuaternion = new THREE.Quaternion();
 				let tmp = new THREE.Vector3();
