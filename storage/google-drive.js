@@ -111,6 +111,7 @@ class GoogleDriveFileList {
         this.driveOption = {};
         this.items = [];
         this.parent = null;
+        this.onupdate = null;
         if (this.options.orderBy == "name") {
             this.driveOption.orderBy = "name" + (this.options.order == "d" ? " desc" : "");
         } else if (this.options.orderBy == "updated") {
@@ -165,6 +166,7 @@ class GoogleDriveFileList {
 
             this.size = this.items.length + (this.cursor ? 1 : 0);
             if (!this.thumbnailUrl && files[0]) this.thumbnailUrl = files[0].thumbnailUrl;
+            this.onupdate?.();
         })();
         try {
             await this.loadPromise;
