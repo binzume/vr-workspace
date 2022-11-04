@@ -46,17 +46,7 @@ AFRAME.registerSystem('xranchor', {
 				info.transform = pose.transform;
 			}
 		}
-		for (let [relname, obj] of Object.entries(this._objects)) {
-			if (this._relanchors[relname]) {
-				for (let a of this._relanchors[relname].anchors) {
-					if (this._anchors[a.uuid]?.transform) {
-						let mat = new THREE.Matrix4().fromArray(this._anchors[a.uuid].transform.matrix);
-						obj.matrixWorld.fromArray(a.matrix).premultiply(mat).decompose(obj.position,obj.quaternion, new THREE.Vector3());
-						break;
-					}
-				}
-			}
-		}
+		this._updateObjectTransforms();
 
 		if (Object.keys(this._anchors).length == 0  && !this._creating) {
 			console.log('xranchor system: createAnchor');
@@ -99,6 +89,22 @@ AFRAME.registerSystem('xranchor', {
 		}
 		return null;
 	},
+	_updateObjectTransforms() {
+		let tmpmat = new THREE.Matrix4();
+		for (let [relname, obj] of Object.entries(this._objects)) {
+			if (this._relanchors[relname]) {
+				for (let a of this._relanchors[relname].anchors) {
+					if (this._anchors[a.uuid]?.transform) {
+						obj.matrixWorld
+							.fromArray(a.matrix)
+							.premultiply(tmpmat.fromArray(this._anchors[a.uuid].transform.matrix))
+							.decompose(obj.position, obj.quaternion, new THREE.Vector3());
+						break;
+					}
+				}
+			}
+		}
+	},
 	_save() {
 		let uuids = Object.keys(this._anchors);
 		localStorage.setItem('xranchorUUIDs', uuids.join(','));
@@ -139,9 +145,7 @@ AFRAME.registerSystem('xranchor', {
 	*/
 	registerRelativeAnchor(name, obj) {
 		this._objects[name] = obj;
-		if ( this.el.sceneEl.renderer.xr.getSession()) {
-			this._needUpdate = true;
-		}
+		this._updateObjectTransforms();
 	},
 	/**
 	* @param {string} name 
