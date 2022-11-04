@@ -1,5 +1,3 @@
-// import { THREE } from "aframe";
-
 AFRAME.registerSystem('xranchor', {
 	/** @type {Record<string, {uuid:string, anchor: XRAnchor|null, transform?: XRRigidTransform}>} */
 	_anchors: {},
@@ -145,8 +143,13 @@ AFRAME.registerSystem('xranchor', {
 			this._needUpdate = true;
 		}
 	},
+	/**
+	* @param {string} name 
+	*/
+	unregisterRelativeAnchor(name) {
+		delete this._objects[name];
+	},
 });
-
 
 AFRAME.registerComponent('xranchor', {
 	schema: {
@@ -162,5 +165,9 @@ AFRAME.registerComponent('xranchor', {
 			});
 		}
 	},
+	remove() {
+		let sys = this.el.sceneEl.systems.xranchor;
+		sys.unregisterRelativeAnchor(this.data.anchorName || this.el.id);
+	}
 });
 
