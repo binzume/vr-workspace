@@ -1,5 +1,6 @@
+
 AFRAME.registerSystem('xranchor', {
-	/** @type {Record<string, {uuid:string, anchor: XRAnchor|null, transform?: XRRigidTransform}>} */
+	/** @type {Record<string, {uuid:string, anchor: XRAnchor|null, matrix?: THREE.Matrix4}>} */
 	_anchors: {},
 	/** @type {Record<string, {anchors:{uuid:string, matrix: number[]}[]}>} */
 	_relanchors: {},
@@ -12,55 +13,60 @@ AFRAME.registerSystem('xranchor', {
 		this._relanchors = {};
 		this._objects = {};
 
-		let features = this.el.sceneEl.getAttribute('webxr')?.optionalFeatures || [];
+		let webxr = this.el.sceneEl.getAttribute('webxr') || {};
+		let features = webxr.optionalFeatures ||= [];
 		if (!features.includes('anchors')) {
 			features.push('anchors');
-			this.el.sceneEl.setAttribute('webxr', { optionalFeatures: features });
+			this.el.sceneEl.setAttribute('webxr', webxr);
 		}
 
 		let renderer = this.el.sceneEl.renderer;
-		let sessionstart = () => {
+		let onsessionstart = () => {
 			this.restoreAnchors();
-			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev=> this._needUpdate = true);
+			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev => this._needUpdate = true);
 		};
 		if (renderer.xr.getReferenceSpace()) {
-			sessionstart();
+			onsessionstart();
 		} else {
-			renderer.xr.addEventListener( 'sessionstart', () => sessionstart());
+			renderer.xr.addEventListener('sessionstart', onsessionstart);
 		}
 	},
 	tick(t) {
 		if (!this._needUpdate) {
 			return;
 		}
-		let xrFrame = this.el.sceneEl.renderer.xr.getFrame();
-		let space = this.el.sceneEl.renderer.xr.getReferenceSpace();
-		if (xrFrame == null || space == null) {
+		let frame = this.el.sceneEl.renderer.xr.getFrame();
+		if (frame == null) {
 			return;
 		}
 		this._needUpdate = false;
 
-		for (let info of Object.values(this._anchors)) {
-			if (info.anchor) {
-				let pose = xrFrame.getPose(info.anchor.anchorSpace, space);
-				info.transform = pose.transform;
+		// Update anchor matrix
+		let space = this.el.sceneEl.renderer.xr.getReferenceSpace();
+		for (let a of Object.values(this._anchors)) {
+			if (a.anchor) {
+				let pose = frame.getPose(a.anchor.anchorSpace, space);
+				a.matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
 			}
 		}
 		this._updateObjectTransforms();
 
-		if (Object.keys(this._anchors).length == 0  && !this._creating) {
-			console.log('xranchor system: createAnchor');
+		if (Object.keys(this._anchors).length == 0 && !this._creating) {
 			this._creating = true;
-			let anchorPose = new XRRigidTransform();
-			xrFrame.createAnchor(anchorPose, space).then((anchor) => {
-				console.log("xranchor system: Anchor created");
-				anchor.requestPersistentHandle().then(id => {
-					console.log("xranchor system: uuid=" + id);
-					this._addAnchor(id, anchor);
-					this._creating = false;
-				});
-			});
+			this.createAnchor(frame, space).finally(_ => this._creating = false);
 		}
+	},
+	/**
+	 * @param {XRFrame} frame 
+	 * @param {XRReferenceSpace} space 
+	 */
+	async createAnchor(frame, space) {
+		console.log('xranchor system: createAnchor');
+		let anchorPose = new XRRigidTransform();
+		let anchor = await frame.createAnchor(anchorPose, space);
+		let id = anchor.requestPersistentHandle ? (await anchor.requestPersistentHandle()) : '_';
+		console.log("xranchor system: Anchor created", id);
+		this._addAnchor(id, anchor);
 	},
 	async restoreAnchors() {
 		let xrSession = this.el.sceneEl.renderer.xr.getSession();
@@ -90,14 +96,13 @@ AFRAME.registerSystem('xranchor', {
 		return null;
 	},
 	_updateObjectTransforms() {
-		let tmpmat = new THREE.Matrix4();
 		for (let [relname, obj] of Object.entries(this._objects)) {
 			if (this._relanchors[relname]) {
 				for (let a of this._relanchors[relname].anchors) {
-					if (this._anchors[a.uuid]?.transform) {
+					if (this._anchors[a.uuid]?.matrix) {
 						obj.matrixWorld
 							.fromArray(a.matrix)
-							.premultiply(tmpmat.fromArray(this._anchors[a.uuid].transform.matrix))
+							.premultiply(this._anchors[a.uuid].matrix)
 							.decompose(obj.position, obj.quaternion, new THREE.Vector3());
 						break;
 					}
@@ -106,7 +111,7 @@ AFRAME.registerSystem('xranchor', {
 		}
 	},
 	_save() {
-		let uuids = Object.keys(this._anchors);
+		let uuids = Object.keys(this._anchors).filter(id => id != '_');
 		localStorage.setItem('xranchorUUIDs', uuids.join(','));
 		localStorage.setItem('xranchorRels', JSON.stringify(this._relanchors));
 	},
@@ -119,24 +124,17 @@ AFRAME.registerSystem('xranchor', {
 	 * @param {string} name 
 	 * @param {THREE.Object3D} obj
 	 */
-	 updateRelativeAnchor(name, obj) {
-		if (obj == null) {
-			delete this._objects[name];
-			delete this._relanchors[name];
-			this._save();
-			return;
-		}
+	updateRelativeAnchor(name, obj) {
 		this._objects[name] = obj;
 		let relanchor = { anchors: [] };
 		for (let info of Object.values(this._anchors)) {
-			if (info.transform) {
+			if (info.matrix) {
 				obj.updateMatrixWorld();
-				let mat = new THREE.Matrix4().fromArray(info.transform.matrix).invert().multiply(obj.matrixWorld);
+				let mat = info.matrix.clone().invert().multiply(obj.matrixWorld);
 				relanchor.anchors.push({ uuid: info.uuid, matrix: mat.toArray() });
 			}
 		}
 		this._relanchors[name] = relanchor;
-		console.log('updateRelativeAnchor', relanchor.anchors.length);
 		this._save();
 	},
 	/**
@@ -149,25 +147,32 @@ AFRAME.registerSystem('xranchor', {
 	},
 	/**
 	* @param {string} name 
+	* @param {boolean} permanent 
 	*/
-	unregisterRelativeAnchor(name) {
+	unregisterRelativeAnchor(name, permanent = false) {
 		delete this._objects[name];
+		if (permanent) {
+			delete this._relanchors[name];
+			this._save();
+		}
 	},
 });
 
 AFRAME.registerComponent('xranchor', {
 	schema: {
 		anchorName: { default: '' },
-		saveEvent: { default: 'click' },
+		saveEvent: { default: '' },
 	},
 	init() {
 		let sys = this.el.sceneEl.systems.xranchor;
 		sys.registerRelativeAnchor(this.data.anchorName || this.el.id, this.el.object3D);
 		if (this.data.saveEvent) {
-			this.el.addEventListener(this.data.saveEvent, (ev) => {
-				sys.updateRelativeAnchor(this.data.anchorName || this.el.id, this.el.object3D);
-			});
+			this.el.addEventListener(this.data.saveEvent, (ev) => this.updateAnchor());
 		}
+	},
+	updateAnchor() {
+		let sys = this.el.sceneEl.systems.xranchor;
+		sys.updateRelativeAnchor(this.data.anchorName || this.el.id, this.el.object3D);
 	},
 	remove() {
 		let sys = this.el.sceneEl.systems.xranchor;
