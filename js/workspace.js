@@ -487,6 +487,12 @@ AFRAME.registerComponent('camera-control', {
 			distance = Math.max(0.1, distance + ev.deltaY * speedFactor);
 			updateCamera();
 		});
+		let renderer = this.el.sceneEl.renderer;
+		if (renderer.xr.getReferenceSpace()) {
+			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev=> this.resetPosition());
+		} else {
+			renderer.xr.addEventListener( 'sessionstart', () => renderer.xr.getReferenceSpace()?.addEventListener('reset', ev=> this.resetPosition()) );
+		}
 	},
 	resetPosition() {
 		let sky = this.el.sceneEl.querySelector('a-sky');
