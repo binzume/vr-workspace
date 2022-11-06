@@ -1,9 +1,10 @@
-
 AFRAME.registerSystem('xrplane-preview', {
 	/** @type {Set<XRPlane>} */
 	_planes: null,
 	/** @type {THREE.LineBasicMaterial} */
 	_material: null,
+	/** @type {THREE.Group} */
+	_rootObject: null,
 	_tickCount: 0,
 	init() {
 		this._planes = new Set();
@@ -14,16 +15,33 @@ AFRAME.registerSystem('xrplane-preview', {
 			this.el.sceneEl.setAttribute('webxr', webxr);
 		}
 		this._material = new THREE.LineBasicMaterial({
-			color: 0xffffff,
-			linewidth: 1,
+			color: 0x00ff00,
+			linewidth: 2,
 		});
+		this._rootObject = new THREE.Group();
+		this.el.setObject3D('xrplanes', this._rootObject);
+
+		let renderer = this.el.sceneEl.renderer;
+		let onsessionstart = () => {
+			this._resetPlanes();
+			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev => this._resetPlanes());
+		};
+		if (renderer.xr.getReferenceSpace()) {
+			onsessionstart();
+		} else {
+			renderer.xr.addEventListener('sessionstart', onsessionstart);
+		}
+	},
+	_resetPlanes() {
+		this._planes.clear();
+		this._rootObject.clear();
 	},
 	tick(t) {
 		if (this._tickCount++ % 60) {
 			return;
 		}
 		let frame = this.el.sceneEl.renderer.xr.getFrame();
-		if (frame == null || frame.detectedPlanes == null) {
+		if (frame?.detectedPlanes == null) {
 			return;
 		}
 		let space = this.el.sceneEl.renderer.xr.getReferenceSpace();
@@ -37,7 +55,7 @@ AFRAME.registerSystem('xrplane-preview', {
 				let line = new THREE.Line(geometry, this._material);
 				line.position.copy(pose.transform.position);
 				line.quaternion.copy(pose.transform.orientation);
-				this.el.object3D.add(line);
+				this._rootObject.add(line);
 			}
 		}
 	},
