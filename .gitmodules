@@ -4,9 +4,6 @@
 [submodule "apps/rosso"]
 	path = apps/rosso
 	url = https://github.com/binzume/webvr-rosso.git
-[submodule "libs/utils"]
-	path = libs/utils
-	url = https://github.com/binzume/vr-utils.git
 [submodule "libs/mp4player"]
 	path = libs/mp4player
 	url = https://github.com/binzume/mp4js.git
