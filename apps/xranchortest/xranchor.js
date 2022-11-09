@@ -35,7 +35,7 @@ AFRAME.registerSystem('xranchor', {
 		if (!this._needUpdate) {
 			return;
 		}
-		let frame = this.el.sceneEl.renderer.xr.getFrame();
+		let frame = this.el.sceneEl.renderer.xr.getFrame?.();
 		if (frame == null) {
 			return;
 		}
@@ -51,7 +51,7 @@ AFRAME.registerSystem('xranchor', {
 		}
 		this._updateObjectTransforms();
 
-		if (Object.keys(this._anchors).length == 0 && !this._creating) {
+		if (!this._getAvailableAnchor() && !this._creating) {
 			this._creating = true;
 			this.createAnchor(frame, space).finally(_ => this._creating = false);
 		}
@@ -69,6 +69,7 @@ AFRAME.registerSystem('xranchor', {
 		this._addAnchor(id, anchor);
 	},
 	async restoreAnchors() {
+		this._creating = true;
 		let xrSession = this.el.sceneEl.renderer.xr.getSession();
 		this._relanchors = JSON.parse(localStorage.getItem('xranchorRels') || '{}');
 		let ids = (localStorage.getItem('xranchorUUIDs') || '').split(',').filter(s => s != '');
@@ -79,6 +80,7 @@ AFRAME.registerSystem('xranchor', {
 				this._needUpdate = true;
 			});
 		}));
+		this._creating = false;
 	},
 	_addAnchor(id, anchor) {
 		if (!this._anchors[id]) {
@@ -126,15 +128,18 @@ AFRAME.registerSystem('xranchor', {
 	 */
 	updateRelativeAnchor(name, obj) {
 		this._objects[name] = obj;
-		let relanchor = { anchors: [] };
+		let anchors = [];
 		for (let info of Object.values(this._anchors)) {
 			if (info.matrix) {
 				obj.updateMatrixWorld();
 				let mat = info.matrix.clone().invert().multiply(obj.matrixWorld);
-				relanchor.anchors.push({ uuid: info.uuid, matrix: mat.toArray() });
+				anchors.push({ uuid: info.uuid, matrix: mat.toArray() });
 			}
 		}
-		this._relanchors[name] = relanchor;
+		this._relanchors[name] = { anchors:anchors };
+		if (anchors.length == 0) {
+			this._needUpdate = true;
+		}
 		this._save();
 	},
 	/**

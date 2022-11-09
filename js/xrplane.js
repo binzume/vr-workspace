@@ -40,7 +40,7 @@ AFRAME.registerSystem('xrplane-preview', {
 		if (this._tickCount++ % 60) {
 			return;
 		}
-		let frame = this.el.sceneEl.renderer.xr.getFrame();
+		let frame = this.el.sceneEl.renderer?.xr?.getFrame?.();
 		if (frame?.detectedPlanes == null) {
 			return;
 		}
