@@ -99,34 +99,9 @@ AFRAME.registerComponent('kurage', {
 	 * @param {THREE.BufferGeometry[]} geometries
 	 */
 	_mergeGeometry(geometries, dispose = false) {
-		let dst = new THREE.BufferGeometry();
-		let sz = geometries.reduce((acc, g) => acc + g.getAttribute('position').count, 0);
-		if (sz == 0) {
-			return dst;
-		}
-		for (let [name, attr] of Object.entries(geometries[0].attributes)) {
-			let typedArray = /** @type {new (size: number) => ArrayLike<number>} */ (attr.array.constructor);
-			dst.setAttribute(name, new THREE.BufferAttribute(new typedArray(sz * attr.itemSize), attr.itemSize));
-		}
-		if (geometries[0].index) {
-			let index = [];
-			let offset = 0;
-			for (let g of geometries) {
-				// @ts-ignore
-				for (let i of g.index.array) {
-					index.push(i + offset);
-				}
-				offset += g.getAttribute('position').count;
-			}
-			dst.setIndex(index);
-		}
-		let p = 0;
-		for (let g of geometries) {
-			dst.merge(g, p);
-			p += g.getAttribute('position').count;
-			dispose && g.dispose();
-		}
-		return dst;
+		let ret = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
+		dispose && geometries.forEach(g => g.dispose());
+		return ret;
 	},
 	tick(t) {
 		this.bodyMat.uniforms.time.value = t * 0.001 + this.offset;
