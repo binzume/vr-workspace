@@ -8,6 +8,10 @@ AFRAME.registerComponent('draggable-body', {
             if (dragging) {
                 return;
             }
+            let body = el.body;
+            if (!body) {
+                return;
+            }
             let velocity = new THREE.Vector3(0, 0, 0);
             let prevPos = el.object3D.position.clone();
             let prevTime = el.sceneEl.time;
@@ -20,16 +24,25 @@ AFRAME.registerComponent('draggable-body', {
                 prevTime = el.sceneEl.time;
             }, 50);
             // set mass = 0
-            let draggingObjectMass = el.body.mass;
+            let draggingObjectMass = body.mass;
             dragging = true;
-            el.body.mass = 0;
+            body.mass = 0;
             el.addEventListener('mouseup', ev => {
                 dragging = false;
                 clearInterval(timer);
                 // restore mass
-                el.body.mass = draggingObjectMass;
-                el.body.velocity.copy(velocity);
+                body.mass = draggingObjectMass;
+                body.velocity.copy(velocity);
             }, { once: true });
         });
     }
 });
+
+// old THREE.js API
+if (THREE.Quaternion.prototype.invert) {
+    THREE.Quaternion.prototype.inverse = function () { return this.clone().invert() };
+    let getCenter = THREE.Box3.prototype.getCenter;
+    THREE.Box3.prototype.getCenter = function (c) { return getCenter.apply(this, [c || new THREE.Vector3()]) };
+    let getSize = THREE.Box3.prototype.getSize;
+    THREE.Box3.prototype.getSize = function (c) { return getSize.apply(this, [c || new THREE.Vector3()]) };
+}
