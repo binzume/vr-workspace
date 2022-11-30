@@ -51,6 +51,7 @@ AFRAME.registerComponent('instantiate-on-click', {
 
 AFRAME.registerComponent('starrysky-menu', {
 	schema: {
+		room: { default: 'test' },
 	},
 	init() {
 		this.sphereEl = this.el.sceneEl.querySelector("[celestial-sphere]");
@@ -125,7 +126,7 @@ AFRAME.registerComponent('starrysky-menu', {
 		});
 		this._byName('share').addEventListener('click', ev => {
 			let component = 'pointer-sender';
-			let ws = 'ws://labs.binzume.net:8088/topic/testtest/';
+			let ws = 'wss://labs.binzume.net/topic/' + this.data.room + '/';
 			let v = !this.sphereEl.hasAttribute(component);
 			if (v) {
 				this.sphereEl.setAttribute(component, { raycaster: ev.detail.cursorEl, socket: ws + 'publish' });
