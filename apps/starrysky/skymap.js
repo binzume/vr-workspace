@@ -58,18 +58,18 @@ AFRAME.registerComponent('starrysky-menu', {
 		this._byName('constellations').addEventListener('click', (e) => {
 			let v = !this.sphereEl.getAttribute("celestial-sphere").constellation;
 			this.sphereEl.setAttribute("celestial-sphere", "constellation", v);
-			this._byName('constellations').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
+			this._byName('constellations').setAttribute("xylabel", "color", v ? "#44aaff" : "#ffffff");
 		});
 		this._byName('drawgrid').addEventListener('click', (e) => {
 			let v = !this.sphereEl.getAttribute("celestial-sphere").grid;
 			this.sphereEl.setAttribute("celestial-sphere", "grid", v);
-			this._byName('drawgrid').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
+			this._byName('drawgrid').setAttribute("xylabel", "color", v ? "#44aaff" : "#ffffff");
 			if (this.sphereEl.components['celestial-sphere'].constellationBounds) this.sphereEl.components['celestial-sphere'].constellationBounds.visible = v;
 		});
 		this._byName('drawsol').addEventListener('click', (e) => {
 			let v = !this.sphereEl.getAttribute("celestial-sphere").solarsystem;
 			this.sphereEl.setAttribute("celestial-sphere", "solarsystem", v);
-			this._byName('drawsol').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
+			this._byName('drawsol').setAttribute("xylabel", "color", v ? "#44aaff" : "#ffffff");
 		});
 		this._byName('speed').addEventListener('change', ev => {
 			this.sphereEl.setAttribute("celestial-sphere", "speed", [1, 60, 300, 3600, 0][ev.detail.index]);
@@ -121,7 +121,20 @@ AFRAME.registerComponent('starrysky-menu', {
 			} else {
 				this.sphereEl.removeAttribute(component);
 			}
-			this._byName('selector').querySelector("a-plane")?.setAttribute("material", "diffuse", v ? 0x44aaff : 0xffffff);
+			this._byName('selector').setAttribute("xylabel", "color", v ? "#44aaff" : "#ffffff");
+		});
+		this._byName('share').addEventListener('click', ev => {
+			let component = 'pointer-sender';
+			let ws = 'ws://labs.binzume.net:8088/topic/testtest/';
+			let v = !this.sphereEl.hasAttribute(component);
+			if (v) {
+				this.sphereEl.setAttribute(component, { raycaster: ev.detail.cursorEl, socket: ws + 'publish' });
+				this.sphereEl.setAttribute('pointer-renderer', { socket: ws + 'subscribe' });
+			} else {
+				this.sphereEl.removeAttribute(component);
+				this.sphereEl.removeAttribute('pointer-renderer');
+			}
+			this._byName('share').setAttribute("xylabel", "color", v ? "#44aaff" : "#ffffff");
 		});
 	},
 	remove() {
