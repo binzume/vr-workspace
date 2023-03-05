@@ -45,10 +45,11 @@ class ItemList extends BaseFileList {
      * @param {string} itemPath
      * @param {{[key:string]:string}?} options
      */
-    constructor(apiUrl, itemPath, options) {
+    constructor(apiUrl, itemPath, options, prefix = '') {
         super(itemPath, options);
         this.apiUrl = apiUrl;
         this.name = itemPath;
+        this._pathPrefix = prefix;
         this._pageSize = 20;
         /** @type {Map<number, [page: any] | [Promise, AbortController]>} */
         this._pageCache = new Map();
@@ -86,42 +87,11 @@ class ItemList extends BaseFileList {
             c[1] != null && c[1].abort();
         }
 
-        let offset = page * this._pageSize;
-        let baseUrl = (this.apiUrl + this.itemPath).replace(/[^/]+$/, '');
-        let convUrl = (path) => {
-            if (path == null || path.includes('://')) return path;
-            if (!path.startsWith('/')) {
-                return baseUrl + path;;
-            }
-            return path;
-        };
-
         let ac = new AbortController();
         let task = (async (signal) => {
             await new Promise((resolve) => setTimeout(resolve, this._pageCache.size));
             console.log("fetch page:", page, signal.aborted);
-            let params = "?offset=" + offset + "&limit=" + this._pageSize;
-            if (this.options.orderBy) params += "&orderBy=" + this.options.orderBy;
-            if (this.options.order) params += "&order=" + this.options.order;
-            let response = await fetch(this.apiUrl + this.itemPath + params, { signal: signal });
-            if (!response.ok) {
-                throw "fetch error";
-            }
-            let result = await response.json();
-            for (let item of result.items) {
-                item.url = convUrl(item.url);
-                item.thumbnailUrl = convUrl(item.thumbnailUrl);
-                if (item.type == '') {
-                    let m = item.name.match(/\.(\w+)$/);
-                    if (m) {
-                        item.type = 'application/' + m[1].toLowerCase();
-                    }
-                }
-            }
-            this.size = result.total || (offset + result.items.length);
-            this.name = result.name || this.itemPath;
-
-            if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
+            let result = await this.getFiles(page * this._pageSize, this._pageSize, this.options, signal);
             return result.items;
         })(ac.signal);
         try {
@@ -135,6 +105,48 @@ class ItemList extends BaseFileList {
             this._pageCache.delete(page);
         }
     }
+    async getFiles(offset, limit, options = null, signal = null) {
+        let params = "?offset=" + offset + "&limit=" + limit;
+        if (options.orderBy) params += "&orderBy=" + options.orderBy;
+        if (options.order) params += "&order=" + options.order;
+        let response = await fetch(this.apiUrl + this.itemPath + params, { signal: signal });
+        if (!response.ok) {
+            throw "fetch error";
+        }
+        let result = await response.json();
+        signal?.throwIfAborted();
+
+        let baseUrl = (this.apiUrl + this.itemPath).replace(/[^/]+$/, '');
+        let convUrl = (path) => {
+            if (path == null || path.includes('://')) return path;
+            if (!path.startsWith('/')) {
+                return baseUrl + path;;
+            }
+            return path;
+        };
+        for (let item of result.items) {
+            item.url = convUrl(item.url);
+            item.thumbnailUrl = convUrl(item.thumbnailUrl);
+            if (item.type == '') {
+                let m = item.name.match(/\.(\w+)$/);
+                if (m) {
+                    item.type = 'application/' + m[1].toLowerCase();
+                }
+            }
+            if (item.path) {
+                item.path = this._pathPrefix + item.path;
+            }
+        }
+        this.size = result.total || (offset + result.items.length);
+        this.name = result.name || this.itemPath;
+        if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
+        return {
+            items: result.items,
+            next: result.more ? offset + result.items.length : null,
+            total: result.total
+        };
+    }
+
     getParentPath() {
         if (this.itemPath == '' || this.itemPath == '/') {
             return null;
@@ -154,8 +166,9 @@ class ItemList extends BaseFileList {
 }
 
 class OnMemoryFileList extends BaseFileList {
-    constructor(items, options) {
+    constructor(items, options, prefix = '') {
         super('', options);
+        this._pathPrefix = prefix;
         this.setItems(items);
     }
     setItems(items) {
@@ -175,6 +188,16 @@ class OnMemoryFileList extends BaseFileList {
     contains(item) {
         return this.items.some(i => i.storage === item.storage && i.path === item.path);
     }
+    async getFiles(offset, limit, options = null, signal = null) {
+        if (options && options.sortField) {
+            this._setSort(options.sortField, options.sortOrder);
+        }
+        limit ||= this.items.length;
+        return {
+            items: this.items.slice(offset, offset + limit),
+            next: offset + limit < this.items.length ? offset + limit : null,
+        };
+    }
     _setSort(orderBy, order) {
         let r = order === "a" ? 1 : -1;
         if (orderBy === "name") {
@@ -188,13 +211,13 @@ class OnMemoryFileList extends BaseFileList {
 }
 
 class LocalList extends OnMemoryFileList {
-    constructor(listName, options) {
+    constructor(listName, options, prefix = '') {
         let items = [];
         let s = localStorage.getItem(listName);
         if (s !== null) {
             items = JSON.parse(s);
         }
-        super(items, options);
+        super(items, options, prefix);
         this.itemPath = listName;
         this.name = "Favorites";
     }
@@ -275,6 +298,25 @@ class StorageList extends BaseFileList {
         this.notifyUpdate();
         return true;
     }
+    getFolder(path, prefix = '') {
+        if (!path) {
+            return this;
+        }
+        let [storage, spath] = this._splitPath(path);
+        return this.accessors[storage]?.getFolder(spath, prefix + storage + '/');
+    }
+    parsePath(path) {
+        if (!path) {
+            return [['', 'Storages']];
+        }
+        let [storage, spath] = this._splitPath(path);
+        let acc = this.accessors[storage];
+        return [[storage, acc?.name]].concat(acc?.parsePath(spath) || []);
+    }
+    _splitPath(path) {
+        let storage = path.split('/', 1)[0];
+        return [storage, path.substring(storage.length + 1)];
+    }
     get(position) {
         return Promise.resolve(this.items[position]);
     }
@@ -310,7 +352,9 @@ export async function install() {
         name: "Favorites",
         root: "favoriteItems",
         shortcuts: {},
-        getList: (folder, options) => new LocalList("favoriteItems", options)
+        getList: (folder, options) => new LocalList("favoriteItems", options),
+        getFolder: (folder, prefix) => new LocalList("favoriteItems", undefined, prefix),
+        parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
 
     // TODO: settings for each environment.
@@ -319,14 +363,18 @@ export async function install() {
             name: "Media",
             root: "tags",
             shortcuts: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
-            getList: (folder, options) => new ItemList("../api/", folder, options)
+            getList: (folder, options) => new ItemList("../api/", folder, options),
+            getFolder: (folder, prefix) => new ItemList("../api/", folder, undefined, prefix),
+            parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
     }
     globalThis.storageAccessors['DEMO'] = {
         name: "Demo",
         root: "list.json",
         shortcuts: {},
-        getList: (folder, options) => new ItemList("https://binzume.github.io/demo-assets/", folder, options)
+        getList: (folder, options) => new ItemList("https://binzume.github.io/demo-assets/", folder, options),
+        getFolder: (folder, prefix) => new ItemList("https://binzume.github.io/demo-assets/", folder, undefined, prefix),
+        parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
     return true;
 }
