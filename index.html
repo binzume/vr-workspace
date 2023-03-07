@@ -6,12 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Workspace</title>
   <script type="importmap">{"imports": {"three": "https://threejs.org/build/three.module.js"}}</script>
-  <script id='script-aframe' src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script id='script-aframe' src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
   <script src="libs/mp4player/mp4player.js"></script>
   <script src="js/gesture.js"></script>
   <script src="js/hand-controller.js"></script>
+  <script src="apps/xranchortest/xranchor.js"></script>
   <script src="js/workspace.js"></script>
+  <!-- script src="js/xrplane.js"></script -->
   <script src="storage/internal.js" type='module'></script>
   <script src="storage/google-drive.js" type='module'></script>
   <script src="storage/webkit-filesystem.js" type='module'></script>
@@ -32,13 +34,14 @@
     <a id="app-vrm" href="apps/vrmviewer/template.html" data-content-type="application/vrm,application/glb,model/gltf-binary" class='hidden'>VRM Viewer</a>
     <a id="app-vrm-control-panel" href="apps/vrmviewer/template.html#app-vrm-control-panel" data-wid='vrm-control-panel'>VRM ControlPanel</a>
     <a id="app-game001" href="apps/game001/template.html">Game001</a>
-    <a id="app-camera-test" href="apps/cameratest/template.html">Camera and Screen</a>
     <a id="env-rosso" href="apps/rosso/index.html" data-apptype='env'>env:ROSSO</a>
     <a id="env-kurage" href="apps/kurage/index.html" data-apptype='env'>env:Kurage</a>
     <a id="env-starrysky" href="apps/starrysky/index.html" data-apptype='env'>env:StarrySky</a>
     <a id="env-physics" href="apps/physics/index.html" data-apptype='env'>env:Physics</a>
     <a id="env-default" href="index.html" data-apptype='env'>env:Default</a>
     <a id="env-empty" href="#empty" data-apptype='env'>env:Empty</a>
+    <a id="app-camera-test" href="apps/cameratest/template.html">CameraTest</a>
+    <a id="app-anchor-test" href="apps/xranchortest/index.html" data-wid='anchortest'>AnchorTest</a>
   </div>
 
   <!-- menu pane -->
@@ -48,7 +51,7 @@
         <a-xybutton label="Apps" width="1" launch-on-click="appid:applist"></a-xybutton>
         <a-xybutton label="Storage" width="1" launch-on-click="appid:app-media-selector"></a-xybutton>
         <a-xybutton label="Console" width="1" launch-on-click="appid:app-console"></a-xybutton>
-        <a-xybutton name="exitVRButton" label="Exit VR" width="1"></a-xybutton>
+        <a-xybutton name="exitVRButton" label="Exit" width="1"></a-xybutton>
       </a-xycontainer>
       <a-xycontainer search-box width="5" height="0.6" direction="row" align-items="stretch" justify-items="stretch"  spacing="0.05">
         <a-xyinput name="searchKeyword" width="3"></a-xyinput>
@@ -67,7 +70,7 @@
         <a-entity name="apps-panel-list" xylist="" xyrect=""></a-entity>
       </a-xyscroll>
       <a-xycontainer width="5" height="0.8" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
-        <a-xybutton name="close-button" label="x" width="1"></a-xybutton>
+        <a-xybutton name="close-button" label="x" width="1" position="0 0 0.1"></a-xybutton>
       </a-xycontainer>
     </a-xywindow>
   </script>
