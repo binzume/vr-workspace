@@ -60,11 +60,11 @@ export class WebkitFileSystemWrapper {
 }
 
 class WebkitFileSystemWrapperFileList {
-    constructor(folder, options, storage) {
+    constructor(folder, storage, prefix = '') {
         this._storage = storage;
+        this._pathPrefix = prefix;
         this._folder = folder;
-        this.itemPath = folder || 'WebkitFileSystem';
-        this.writable = true;
+        this.itemPath = folder;
         this.items = [];
         this.size = -1;
     }
@@ -97,8 +97,35 @@ class WebkitFileSystemWrapperFileList {
         this.size = this.items.length;
     }
 
-    async get(position) {
-        return this.items[position];
+	async getInfo() {
+        if (this.size < 0) {
+            await this.init();
+        }
+        return {
+            type: 'folder',
+            size: this.size,
+        };
+    }
+
+    async getFiles(offset, limit, options = null, signal = null) {
+        if (this.size < 0) {
+            await this.init();
+        }
+        return {
+            items: this.items,
+            total: this.items.length
+        };
+    }
+
+    writeFile(name, blob) {
+        return this._storage.writeFile(this.itemPath + '/' + name, blob);
+    }
+
+    getParentPath() {
+        if (this.itemPath == '' || this.itemPath == '/') {
+            return null;
+        }
+        return this._pathPrefix + this.itemPath.substring(0, this.itemPath.lastIndexOf('/'));
     }
 }
 
@@ -126,9 +153,8 @@ export async function install() {
         name: "Local",
         root: '',
         writable: true,
-        shortcuts: {},
-        getList: (folder, options) => new WebkitFileSystemWrapperFileList(folder, options, storageWrapper),
-        writeFile: (path, blob) => storageWrapper.writeFile(path, blob),
+        getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
+        parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
     };
     return true;
 }

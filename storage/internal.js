@@ -1,41 +1,19 @@
 
-/** 
- * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?; size: number?}} ContentInfo
- */
-
-export class BaseFileList {
+class BaseFileList {
     /**
      * @param {string} itemPath
-     * @param {{[key:string]:string}?} options
      */
-    constructor(itemPath, options) {
+    constructor(itemPath) {
         this.itemPath = itemPath;
-        this.options = options || {};
         this.size = -1;
         this.name = "";
-        /** @type {string} */
-        this.thumbnailUrl = null;
         this.onupdate = null;
     }
-
-    /**
-     * @returns {Promise<void>}
-     */
-    async init() {
-        await this.get(0)
-    }
-
-    /**
-     * @returns {Promise<ContentInfo>}
-     */
-    async get(position) {
-        throw 'not implemented';
-    }
-
     notifyUpdate() {
-        if (this.onupdate) {
-            this.onupdate();
-        }
+        this.onupdate && this.onupdate();
+    }
+    getParentPath() {
+        return null;
     }
 }
 
@@ -43,69 +21,16 @@ class ItemList extends BaseFileList {
     /**
      * @param {string} apiUrl
      * @param {string} itemPath
-     * @param {{[key:string]:string}?} options
      */
-    constructor(apiUrl, itemPath, options, prefix = '') {
-        super(itemPath, options);
+    constructor(apiUrl, itemPath, prefix = '') {
+        super(itemPath);
         this.apiUrl = apiUrl;
         this.name = itemPath;
         this._pathPrefix = prefix;
-        this._pageSize = 20;
-        /** @type {Map<number, [page: any] | [Promise, AbortController]>} */
-        this._pageCache = new Map();
-        this._pageCacheMax = 10;
     }
-    init() {
-        return this._load(0);
-    }
-    /**
-     * @param {number} position
-     */
-    async get(position) {
-        if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
-        let item = this._getOrNull(position);
-        if (item != null) {
-            return item;
-        }
-        let result = await this._load(position / this._pageSize | 0);
-        return result && result[position % this._pageSize];
-    }
-    /**
-     * @param {number} page
-     */
-    async _load(page) {
-        let cache = this._pageCache.get(page);
-        if (cache != null) {
-            return (cache.length == 2) ? await cache[0] : cache[0];
-        }
-        for (const [p, c] of this._pageCache) {
-            if (this._pageCache.size < this._pageCacheMax) {
-                break;
-            }
-            console.log("invalidate: " + p, c[1] != null);
-            this._pageCache.delete(p);
-            c[1] != null && c[1].abort();
-        }
 
-        let ac = new AbortController();
-        let task = (async (signal) => {
-            await new Promise((resolve) => setTimeout(resolve, this._pageCache.size));
-            console.log("fetch page:", page, signal.aborted);
-            let result = await this.getFiles(page * this._pageSize, this._pageSize, this.options, signal);
-            return result.items;
-        })(ac.signal);
-        try {
-            this._pageCache.set(page, [task, ac]);
-            let result = await task;
-            if (this._pageCache.has(page)) {
-                this._pageCache.set(page, [result]);
-            }
-            return result;
-        } catch (e) {
-            this._pageCache.delete(page);
-        }
-    }
     async getFiles(offset, limit, options = null, signal = null) {
+        options ||= {};
         let params = "?offset=" + offset + "&limit=" + limit;
         if (options.orderBy) params += "&orderBy=" + options.orderBy;
         if (options.order) params += "&order=" + options.order;
@@ -139,7 +64,6 @@ class ItemList extends BaseFileList {
         }
         this.size = result.total || (offset + result.items.length);
         this.name = result.name || this.itemPath;
-        if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
         return {
             items: result.items,
             next: result.more ? offset + result.items.length : null,
@@ -148,49 +72,37 @@ class ItemList extends BaseFileList {
     }
 
     getParentPath() {
-        if (this.itemPath == '' || this.itemPath == '/') {
+        let p = this.itemPath.lastIndexOf('/');
+        if (p < 0) {
             return null;
         }
-        return this.itemPath.substring(0, this.itemPath.lastIndexOf('/'));
-    }
-    _getOrNull(position) {
-        let page = position / this._pageSize | 0;
-        let cache = this._pageCache.get(page);
-        if (cache) {
-            this._pageCache.delete(page);
-            this._pageCache.set(page, cache);
-            return cache[0][position - this._pageSize * page];
-        }
-        return null;
+        return this._pathPrefix + this.itemPath.substring(0, p);
     }
 }
 
-class OnMemoryFileList extends BaseFileList {
-    constructor(items, options, prefix = '') {
-        super('', options);
+class ArrayFileList extends BaseFileList {
+    constructor(items, itemPath, prefix = '') {
+        super(itemPath);
         this._pathPrefix = prefix;
         this.setItems(items);
     }
+    async getInfo() {
+        return {
+            type: 'folder',
+            name: this.name,
+            size: this.items.length,
+        };
+    }
     setItems(items) {
         this.items = items;
-        let options = this.options;
-        if (options.orderBy) {
-            this._setSort(options.orderBy, options.order);
-        }
         this.size = this.items.length;
     }
-    init() {
-        return this.get(0)
-    }
-    get(position) {
-        return Promise.resolve(this.items[position]);
-    }
     contains(item) {
-        return this.items.some(i => i.storage === item.storage && i.path === item.path);
+        return this.items.some(i => i.path === item.path);
     }
     async getFiles(offset, limit, options = null, signal = null) {
         if (options && options.sortField) {
-            this._setSort(options.sortField, options.sortOrder);
+            this._sort(options.sortField, options.sortOrder);
         }
         limit ||= this.items.length;
         return {
@@ -198,7 +110,7 @@ class OnMemoryFileList extends BaseFileList {
             next: offset + limit < this.items.length ? offset + limit : null,
         };
     }
-    _setSort(orderBy, order) {
+    _sort(orderBy, order) {
         let r = order === "a" ? 1 : -1;
         if (orderBy === "name") {
             this.items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
@@ -210,27 +122,26 @@ class OnMemoryFileList extends BaseFileList {
     }
 }
 
-class LocalList extends OnMemoryFileList {
-    constructor(listName, options, prefix = '') {
+class LocalList extends ArrayFileList {
+    constructor(listName, prefix = '') {
         let items = [];
         let s = localStorage.getItem(listName);
         if (s !== null) {
             items = JSON.parse(s);
         }
-        super(items, options, prefix);
-        this.itemPath = listName;
+        super(items, listName, prefix);
         this.name = "Favorites";
     }
-    addItem(item, storage = null) {
+    addItem(item) {
         if (this.contains(item)) return;
         this.items.push(item);
         this.setItems(this.items);
         localStorage.setItem(this.itemPath, JSON.stringify(this.items));
         this.notifyUpdate();
     }
-    removeItem(item, storage = null) {
-        let s = storage || item.storage, path = item.path;
-        this.items = this.items.filter(i => i.storage != s || i.path != path);
+    removeItem(item) {
+        let path = item.path;
+        this.items = this.items.filter(i => i.path != path);
         this.setItems(this.items);
         localStorage.setItem(this.itemPath, JSON.stringify(this.items));
         this.notifyUpdate();
@@ -241,24 +152,18 @@ class LocalList extends OnMemoryFileList {
         localStorage.removeItem(this.itemPath);
         this.notifyUpdate();
     }
-    _getOrNull(position) {
-        return this.items[position];
-    }
 }
 
 
-class StorageList extends BaseFileList {
-    constructor(accessors, options) {
-        super('', options);
+class StorageList extends ArrayFileList {
+    constructor(accessors) {
+        super([], '');
         this.accessors = accessors || {};
-        this.itemPath = '/';
         this.name = "Storage";
         this._update();
     }
     _update() {
-        /**
-         * @type {object[]}
-         */
+        /** @type {object[]} */
         let items = [];
         for (let [k, sa] of Object.entries(this.accessors)) {
             if (sa == this) {
@@ -266,25 +171,14 @@ class StorageList extends BaseFileList {
             }
             if (sa.shortcuts && Object.keys(sa.shortcuts).length) {
                 Object.keys(sa.shortcuts).forEach(n => {
-                    items.push({ name: n, type: 'folder', storage: k, path: sa.shortcuts[n], updatedTime: '' });
+                    items.push({ name: n, type: 'folder', path: k + '/' + sa.shortcuts[n], updatedTime: '' });
                 });
             } else {
-                items.push({ name: sa.name, type: 'folder', storage: k, path: sa.root, updatedTime: '' });
+                items.push({ name: sa.name, type: 'folder', path: k + '/' + sa.root, updatedTime: '' });
             }
         }
         this.items = items;
         this.size = items.length;
-        let options = this.options;
-        if (options.orderBy) {
-            this._setSort(options.orderBy, options.order);
-        }
-    }
-    getList(storage, path, options) {
-        let accessor = this.accessors[storage];
-        if (!accessor) {
-            return null;
-        }
-        return accessor.getList(path || accessor.root, options);
     }
     addStorage(id, data) {
         this.accessors[id] = data;
@@ -317,23 +211,11 @@ class StorageList extends BaseFileList {
         let storage = path.split('/', 1)[0];
         return [storage, path.substring(storage.length + 1)];
     }
-    get(position) {
-        return Promise.resolve(this.items[position]);
-    }
-    _setSort(orderBy, order) {
-        let r = order === "a" ? 1 : -1;
-        if (orderBy === "name") {
-            this.items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
-        } else if (orderBy === "updated") {
-            this.items.sort((a, b) => (a.updatedTime || "").localeCompare(b.updatedTime) * r);
-        } else if (orderBy === "size") {
-            this.items.sort((a, b) => ((a.size && b.size) ? a.size - b.size : 0) * r);
-        }
-    }
 }
 
 
-export async function install() {
+// install
+(async function () {
     let storageList = new StorageList(globalThis.storageAccessors);
     globalThis.storageAccessors = new Proxy({}, {
         // NOTE: Storage can only be accessed via storageList.
@@ -352,8 +234,7 @@ export async function install() {
         name: "Favorites",
         root: "favoriteItems",
         shortcuts: {},
-        getList: (folder, options) => new LocalList("favoriteItems", options),
-        getFolder: (folder, prefix) => new LocalList("favoriteItems", undefined, prefix),
+        getFolder: (folder, prefix) => new LocalList(folder, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
 
@@ -363,8 +244,7 @@ export async function install() {
             name: "Media",
             root: "tags",
             shortcuts: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
-            getList: (folder, options) => new ItemList("../api/", folder, options),
-            getFolder: (folder, prefix) => new ItemList("../api/", folder, undefined, prefix),
+            getFolder: (folder, prefix) => new ItemList("../api/", folder, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
     }
@@ -372,11 +252,8 @@ export async function install() {
         name: "Demo",
         root: "list.json",
         shortcuts: {},
-        getList: (folder, options) => new ItemList("https://binzume.github.io/demo-assets/", folder, options),
         getFolder: (folder, prefix) => new ItemList("https://binzume.github.io/demo-assets/", folder, undefined, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
     return true;
-}
-
-install();
+})();

@@ -489,9 +489,9 @@ AFRAME.registerComponent('camera-control', {
 		});
 		let renderer = this.el.sceneEl.renderer;
 		if (renderer.xr.getReferenceSpace()) {
-			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev=> this.resetPosition());
+			renderer.xr.getReferenceSpace()?.addEventListener('reset', ev => this.resetPosition());
 		} else {
-			renderer.xr.addEventListener( 'sessionstart', () => renderer.xr.getReferenceSpace()?.addEventListener('reset', ev=> this.resetPosition()) );
+			renderer.xr.addEventListener('sessionstart', () => renderer.xr.getReferenceSpace()?.addEventListener('reset', ev => this.resetPosition()));
 		}
 	},
 	resetPosition() {
@@ -728,7 +728,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		m = fragment.match(/list:(.+)/);
 		if (m) {
 			let mediaList = await window.appManager.launch('app-media-selector');
-			mediaList.setAttribute('media-selector', { path: m[1], storage: 'MEDIA', sortField: 'updated', sortOrder: 'd' });
+			mediaList.setAttribute('media-selector', { path: 'MEDIA/' + m[1], sortField: 'updated', sortOrder: 'd' });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);

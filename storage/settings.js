@@ -9,7 +9,7 @@ let googleApiLoader = new GoogleApiLoader();
 let storageWrapper = new WebkitFileSystemWrapper(storageType);
 
 let currentStorage = 'WebkitFileSystem';
-
+let currentFolder = null;
 
 function makeEl(tag, children, attrs) {
     let el = document.createElement(tag);
@@ -111,14 +111,16 @@ async function updateFileList(storage, path) {
     }
     path = path || accessor.root;
 
-    let list = accessor.getList(path, {});
-    await list.init();
+    let list = accessor.getFolder(path);
+    currentFolder = list;
+    await list.getInfo?.();
 
-    if (list.writable) {
+    if (list.writeFile) {
         document.querySelector('#file-menu').classList.add('writable');
     }
 
-    for (let item of list.items) {
+    let res = await list.getFiles(null, 1000, {});
+    for (let item of res.items) {
         let li = makeEl('li', [formatDate(item.updatedTime), ' ', item.url ? makeEl('a', item.name, { href: item.url }) : item.name, ' ', formatSize(item.size)]);
 
         if (item.remove) {
@@ -164,14 +166,13 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
             type: `file`, multiple: true, style: "display:none"
         });
         inputEl.addEventListener('change', async (ev) => {
-            let accessor = globalThis.storageAccessors[currentStorage];
-            if (!accessor) {
+            if (!currentFolder) {
                 return;
             }
 
             let tasks = [];
             for (let file of inputEl.files) {
-                tasks.push(accessor.writeFile(file.name, file));
+                tasks.push(currentFolder.writeFile(file.name, file));
             }
             document.body.removeChild(inputEl);
             updateFileList();

@@ -1,12 +1,8 @@
 'use strict';
 
-/** 
- * @typedef {import('../../storage/internal.js').BaseFileList} BaseFileList
- */
-
 class FileListCursor {
 	/**
-	 * @param {BaseFileList} fileList
+	 * @param {CachedFolderLoader|ArrayFolderLoader} fileList
 	 * @param {number} position
 	 * @param {((c:ContentInfo) => boolean)} filter
 	 */
@@ -35,9 +31,163 @@ class FileListCursor {
 	}
 }
 
-// @ts-ignore
-let storageList = globalThis.storageList;
+class BaseFolderLoader {
+	/**
+	 * @param {Folder} folder 
+	 * @param {{[key:string]:string}?} options
+	 */
+	constructor(folder, options) {
+		this.folder = folder;
+		this.options = options || {};
+		this.size = -1;
+		/** @type {string} */
+		this._thumbnailUrl = null;
+		this.onupdate = null;
+		folder.onupdate = async () => {
+			let info = await this.folder.getInfo?.();
+			if (info && info.size >= 0) {
+				this.size = info.size;
+			}
+			this.onupdate?.();
+		};
+	}
+	async getInfo() {
+		await this.get(0);
+		let info = await this.folder.getInfo?.();
+		if (info) {
+			this.size = info.size || this.size;
+		}
+		return Object.assign({
+			type: 'folder',
+			name: this.folder.path,
+			size: this.size,
+			thumbnailUrl: this._thumbnailUrl
+		}, info || {});
+	}
 
+	getParentPath() {
+		return this.folder.getParentPath();
+	}
+	/**
+	 * @param {number} position
+	 */
+	async get(position) { }
+}
+
+class CachedFolderLoader extends BaseFolderLoader {
+	/**
+	 * @param {Folder} folder 
+	 * @param {{[key:string]:string}?} options
+	 */
+	constructor(folder, options) {
+		super(folder, options);
+		this._pageSize = 20;
+		/** @type {Map<number, [page: any] | [Promise, AbortController]>} */
+		this._pageCache = new Map();
+		this._pageCacheMax = 10;
+	}
+
+	/**
+	 * @param {number} position
+	 */
+	async get(position) {
+		if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
+		let item = this._getOrNull(position);
+		if (item != null) {
+			return item;
+		}
+		let result = await this._load(position / this._pageSize | 0);
+		return result && result[position % this._pageSize];
+	}
+	async _load(page) {
+		let cache = this._pageCache.get(page);
+		if (cache != null) {
+			return (cache.length == 2) ? await cache[0] : cache[0];
+		}
+		for (const [p, c] of this._pageCache) {
+			if (this._pageCache.size < this._pageCacheMax) {
+				break;
+			}
+			console.log("invalidate: " + p, c[1] != null);
+			this._pageCache.delete(p);
+			c[1] != null && c[1].abort();
+		}
+
+		let ac = new AbortController();
+		let task = (async (signal) => {
+			await new Promise((resolve) => setTimeout(resolve, this._pageCache.size));
+			console.log("fetch page:", page, signal.aborted);
+			let result = await this.folder.getFiles(page * this._pageSize, this._pageSize, this.options, signal);
+			this.size = result.total || page * this._pageSize + result.items.length + (result.next ? 1 : 0);
+			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnailUrl;
+			return result.items;
+		})(ac.signal);
+		try {
+			this._pageCache.set(page, [task, ac]);
+			let result = await task;
+			if (this._pageCache.has(page)) {
+				this._pageCache.set(page, [result]);
+			}
+			return result;
+		} catch (e) {
+			this._pageCache.delete(page);
+		}
+	}
+	_getOrNull(position) {
+		let page = position / this._pageSize | 0;
+		let cache = this._pageCache.get(page);
+		if (cache) {
+			this._pageCache.delete(page);
+			this._pageCache.set(page, cache);
+			return cache[0][position - this._pageSize * page];
+		}
+		return null;
+	}
+}
+
+class ArrayFolderLoader extends BaseFolderLoader {
+	/**
+	 * @param {Folder} folder 
+	 * @param {{[key:string]:string}?} options
+	 */
+	constructor(folder, options) {
+		super(folder, options);
+		this._cursor = null;
+		this._offset = 0;
+		this._loadPromise = null;
+		this._items = [];
+	}
+	async get(position) {
+		let item = this._getOrNull(position);
+		if (item != null) {
+			return item;
+		}
+		if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
+		await this._load();
+		return this._getOrNull(position);
+	}
+	async _load() {
+		if (this._loadPromise !== null) return await this._loadPromise;
+		this._loadPromise = (async () => {
+			let result = await this.folder.getFiles(this._cursor, 200, this.options, null);
+
+			this._items = this._items.concat(result.items);
+			this._cursor = result.next;
+			this.size = result.total || this._items.length + (result.next ? 1 : 0);
+			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnailUrl;
+			this.onupdate?.();
+		})();
+		try {
+			await this._loadPromise;
+		} finally {
+			this._loadPromise = null;
+		}
+	}
+	_getOrNull(position) {
+		if (position < this._offset || position >= this._offset + this._items.length) return null;
+		return this._items[position - this._offset];
+	}
+}
 
 AFRAME.registerComponent('xylist-grid-layout', {
 	dependencies: ['xyrect', 'xylist'],
@@ -97,14 +247,13 @@ AFRAME.registerComponent('xylist-grid-layout', {
 
 AFRAME.registerComponent('media-selector', {
 	schema: {
-		storage: { default: "" },
 		path: { default: "" },
 		sortField: { default: "" },
 		sortOrder: { default: "" },
 		openWindow: { default: false }
 	},
 	init() {
-		this.itemlist = storageList;
+		this.itemlist = globalThis.storageList;
 		this.item = {};
 		this.appManager = null;
 		let videolist = this._byName('medialist').components.xylist;
@@ -116,7 +265,7 @@ AFRAME.registerComponent('media-selector', {
 				// TODO: parse args
 				let p = ev.detail.args.split(/\/(.*)/);
 				if (p.length >= 2) {
-					this.el.setAttribute('media-selector', { path: p[1], storage: p[0], sortField: 'updatedTime', sortOrder: 'd' });
+					this.el.setAttribute('media-selector', { path: ev.detail.args, sortField: 'updatedTime', sortOrder: 'd' });
 				}
 			}
 		}, { once: true });
@@ -269,11 +418,11 @@ AFRAME.registerComponent('media-selector', {
 			}
 			console.log(item);
 			if (item.type === "list" || item.type === "tag") {
-				this._openList(item.storage, item.path);
+				this._openList(item.path);
 			} else if (this.appManager && this.appManager.openContent(item)) {
 				// opened
 			} else if (item.type == "folder" || item.type == "archive") {
-				this._openList(item.storage || this.data.storage, item.path, item.type == "archive");
+				this._openList(item.path, item.type == "archive");
 			} else {
 				var cursor = new FileListCursor(this.itemlist, pos, (item) => {
 					let t = item.type.split("/")[0];
@@ -285,29 +434,22 @@ AFRAME.registerComponent('media-selector', {
 		});
 
 		this._byName('storage-button').addEventListener('click', ev => {
-			this.el.setAttribute("media-selector", { path: '', storage: '_dummy_' });
+			this.el.setAttribute("media-selector", { path: '' });
 		});
 
 		this._byName('option-menu').setAttribute('xyselect', 'select', -1);
 		this._byName('option-menu').addEventListener('change', (ev) => {
 			if (ev.detail.index == 0) {
-				this._openList(this.data.storage, this.data.path, true);
+				this._openList(this.data.path, true);
 			} else if (ev.detail.index == 1) {
-				storageList.getList('Favs').addItem(this.item);
+				storageList.getFolder('Favs').addItem(this.item);
 			} else if (ev.detail.index == 2) {
-				storageList.getList('Favs').removeItem(this.item);
+				storageList.getFolder('Favs').removeItem(this.item);
 			}
 		});
 
 		this._byName('parent-button').addEventListener('click', (ev) => {
-			if (this.itemlist.getParentPath) {
-				let parent = this.itemlist.getParentPath();
-				if (parent != null) {
-					this._openList(this.data.storage, parent);
-				} else {
-					this.el.setAttribute("media-selector", { path: '', storage: '_dummy_' });
-				}
-			}
+			this._openList(this.itemlist.getParentPath() || '');
 		});
 
 		this._byName('sort-option').setAttribute('values', ["Name", "Update", "Size", "Type"].join(","));
@@ -320,37 +462,44 @@ AFRAME.registerComponent('media-selector', {
 	update() {
 		let path = this.data.path;
 		console.log("load list: ", path);
-		this.item = { type: "list", path: path, name: path, storage: this.data.storage };
+		this.item = { type: "list", path: path, name: path };
 		this._loadList(path);
 	},
 	remove() {
 		this.itemlist.onupdate = null;
 	},
-	async _openList(storage, path, openWindow) {
+	async _openList(path, openWindow) {
 		if ((openWindow || this.data.openWindow) && this.appManager) {
 			let mediaList = await this.appManager.launch('app-media-selector');
 			let pos = new THREE.Vector3().set(this.el.getAttribute("width") * 1 + 0.3, 0, 0);
 			mediaList.setAttribute("rotation", this.el.getAttribute("rotation"));
 			mediaList.setAttribute("position", this.el.object3D.localToWorld(pos));
 			mediaList.setAttribute('window-locator', { applyCameraPos: false, updateRotation: false });
-			mediaList.setAttribute("media-selector", "path:" + path + (storage ? ";storage:" + storage : ""));
+			mediaList.setAttribute("media-selector", "path:" + path);
 		} else {
-			this.el.setAttribute("media-selector", "path:" + path + (storage ? ";storage:" + storage : ""));
+			this.el.setAttribute("media-selector", "path:" + path);
 		}
 	},
 	_loadList(path) {
 		this.itemlist.onupdate = null;
-		this.itemlist = storageList.getList(this.data.storage, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
-		if (!this.itemlist) {
-			storageList._setSort(this.data.sortField, this.data.sortOrder);
-			this.itemlist = storageList;
+		let list = storageList.getFolder(path);
+		if (list == null) {
+			return;
 		}
+		if (list.randomAccess === false) {
+			this.itemlist = new ArrayFolderLoader(list, { orderBy: this.data.sortField, order: this.data.sortOrder });
+		} else {
+			this.itemlist = new CachedFolderLoader(list, { orderBy: this.data.sortField, order: this.data.sortOrder });
+		}
+
 		this.el.setAttribute("title", "Loading...");
 		let mediaList = this._byName('medialist').components.xylist;
 		mediaList.setContents([]);
-		this.itemlist.init().then(() => {
-			this.item.name = this.itemlist.name || this.itemlist.itemPath;
-			this.item.thumbnailUrl = this.itemlist.thumbnailUrl;
+		this.itemlist.getInfo().then((info) => {
+			let p = storageList.parsePath(path).pop();
+			this.item.path = path;
+			this.item.name = info.name || p[1] || p[0];
+			this.item.thumbnailUrl = info.thumbnailUrl;
 			mediaList.setContents(this.itemlist, this.itemlist.size);
 			this.itemlist.onupdate = () => {
 				setTimeout(() => mediaList.setContents(this.itemlist, this.itemlist.size, false), 0);
@@ -905,7 +1054,7 @@ AFRAME.registerGeometry('cubemapbox', {
 			} else {
 				[uv[i][0], uv[i][3], uv[i][1], uv[i][2]].forEach((v, j) => {
 					v.toArray(uvattr.array, i * 8 + j * 2);
-				});	
+				});
 			}
 		}
 		this.geometry = geometry;

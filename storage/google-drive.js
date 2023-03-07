@@ -8,6 +8,7 @@ const gapiUrl = 'https://apis.google.com/js/api.js?onload=gapiLoaded';
 const callbackName = 'gapiLoaded';
 const clientIds = {
     "http://localhost:8080": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
+    "http://nas.binzume.net": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
     "https://binzume.github.io": "86954684848-okobt1r6kedh2cskabcgmbbqe0baphjb.apps.googleusercontent.com"
 };
 
@@ -97,61 +98,28 @@ export class GoogleDrive {
     }
 }
 class GoogleDriveFileList {
-    constructor(folder, options, drive, pathPrefix) {
-        this.itemPath = folder;
-        this.options = options || {};
-        this.size = -1;
+    constructor(folderId, options, drive, pathPrefix) {
+        this.itemPath = folderId;
         this.name = "";
         this.thumbnailUrl = null;
+        /** @type {GoogleDrive} */
         this.drive = drive;
-        this.cursor = null;
-        this.offset = 0;
-        this.loadPromise = null;
-        this.items = [];
         this.parent = null;
         this.onupdate = null;
         this.randomAccess = false;
         this._pathPrefix = pathPrefix;
     }
-    async init() {
-        await Promise.all([
-            this._load(),
-            this.drive.getFile(this.itemPath).then(f => {
-                this.name = f.name;
-                if (f.parents && f.parents.length > 0) {
-                    this.parent = f.parents[0];
-                }
-            })
-        ]);
-    }
-    async get(position) {
-        let item = this._getOrNull(position);
-        if (item != null) {
-            return item;
-        }
-        if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
-        await this._load();
-        return this._getOrNull(position);
-    }
-    async getFileUrl(file) {
-        return URL.createObjectURL(await this.drive.fetch(file.id));
-    }
-    async _load() {
-        if (this.loadPromise !== null) return await this.loadPromise;
-        this.loadPromise = (async () => {
-            let result = await this.getFiles(this.cursor, 200, this.options, null);
-
-            this.items = this.items.concat(result.items);
-            this.cursor = result.next;
-            this.size = this.items.length + (this.cursor ? 1 : 0);
-            if (!this.thumbnailUrl && result.items[0]) this.thumbnailUrl = result.items[0].thumbnailUrl;
-            this.onupdate?.();
-        })();
-        try {
-            await this.loadPromise;
-        } finally {
-            this.loadPromise = null;
-        }
+    async getInfo() {
+        await this.drive.getFile(this.itemPath).then(f => {
+            this.name = f.name;
+            if (f.parents && f.parents.length > 0) {
+                this.parent = f.parents[0];
+            }
+        });
+        return {
+            type: 'folder',
+            name: this.name,
+        };
     }
     async getFiles(offset, limit, options = null, signal = null) {
         options = options || {};
@@ -168,13 +136,12 @@ class GoogleDriveFileList {
             type: f.mimeType == "application/vnd.google-apps.folder" ? "folder" : f.mimeType,
             duration: 0,
             id: f.id,
-            path: f.id,
+            path: this._pathPrefix + f.id,
             name: f.name,
             size: f.size,
             tags: [this.itemPath],
             thumbnailUrl: (f.thumbnailLink && !f.thumbnailLink.startsWith("https://docs.google.com/")) ? f.thumbnailLink : null,
             updatedTime: f.modifiedTime,
-            url: null, // use getFileUrl()
             fetch(start, end) { return drive.fetch(this.id, start, end); },
             update(blob) { return drive.update(this.id, blob); },
             remove() { return drive.delete(this.id); },
@@ -184,12 +151,17 @@ class GoogleDriveFileList {
             next: result.nextPageToken
         };
     }
-    getParentPath() {
-        return this.parent;
+    /**
+     * @param {string} name 
+     * @param {Blob} blob 
+     */
+    async writeFile(name, blob) {
+        let f = await this.drive.create(name, '', blob.type, this.itemPath);
+        console.log(JSON.parse(f.body));
+        return await this.drive.update(JSON.parse(f.body).id, blob);
     }
-    _getOrNull(position) {
-        if (position < this.offset || position >= this.offset + this.items.length) return null;
-        return this.items[position - this.offset];
+    getParentPath() {
+        return this._pathPrefix + this.parent;
     }
 }
 
@@ -250,7 +222,6 @@ export async function install() {
         name: "Google Drive",
         root: 'root',
         shortcuts: {},
-        getList: (folder, options) => new GoogleDriveFileList(folder, options, drive),
         getFolder: (folder, prefix) => new GoogleDriveFileList(folder, {}, drive, prefix),
         parsePath: (path) => path ? [[path]] : []
     };
