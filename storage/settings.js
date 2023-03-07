@@ -109,7 +109,7 @@ async function updateFileList(storage, path) {
     if (!accessor) {
         return;
     }
-    path = path || accessor.root;
+    path = path || accessor.root || '';
 
     let list = accessor.getFolder(path);
     currentFolder = list;

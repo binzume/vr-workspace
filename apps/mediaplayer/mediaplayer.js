@@ -36,8 +36,9 @@ class BaseFolderLoader {
 	 * @param {Folder} folder 
 	 * @param {{[key:string]:string}?} options
 	 */
-	constructor(folder, options) {
+	constructor(folder, path, options) {
 		this.folder = folder;
+		this.path = path;
 		this.options = options || {};
 		this.size = -1;
 		/** @type {string} */
@@ -48,6 +49,7 @@ class BaseFolderLoader {
 			if (info && info.size >= 0) {
 				this.size = info.size;
 			}
+			this._clearCache();
 			this.onupdate?.();
 		};
 	}
@@ -59,19 +61,17 @@ class BaseFolderLoader {
 		}
 		return Object.assign({
 			type: 'folder',
-			name: this.folder.path,
+			name: this.path,
 			size: this.size,
 			thumbnailUrl: this._thumbnailUrl
 		}, info || {});
 	}
 
-	getParentPath() {
-		return this.folder.getParentPath();
-	}
 	/**
 	 * @param {number} position
 	 */
 	async get(position) { }
+	_clearCache() { }
 }
 
 class CachedFolderLoader extends BaseFolderLoader {
@@ -79,12 +79,16 @@ class CachedFolderLoader extends BaseFolderLoader {
 	 * @param {Folder} folder 
 	 * @param {{[key:string]:string}?} options
 	 */
-	constructor(folder, options) {
-		super(folder, options);
-		this._pageSize = 20;
+	constructor(folder, path, options) {
+		super(folder, path, options);
+		this._pageSize = 40;
 		/** @type {Map<number, [page: any] | [Promise, AbortController]>} */
 		this._pageCache = new Map();
 		this._pageCacheMax = 10;
+	}
+
+	_clearCache() {
+		this._pageCache.clear();
 	}
 
 	/**
@@ -96,8 +100,8 @@ class CachedFolderLoader extends BaseFolderLoader {
 		if (item != null) {
 			return item;
 		}
-		let result = await this._load(position / this._pageSize | 0);
-		return result && result[position % this._pageSize];
+		await this._load(position / this._pageSize | 0);
+		return this._getOrNull(position);
 	}
 	async _load(page) {
 		let cache = this._pageCache.get(page);
@@ -150,19 +154,19 @@ class ArrayFolderLoader extends BaseFolderLoader {
 	 * @param {Folder} folder 
 	 * @param {{[key:string]:string}?} options
 	 */
-	constructor(folder, options) {
-		super(folder, options);
+	constructor(folder, path, options) {
+		super(folder, path, options);
 		this._cursor = null;
 		this._offset = 0;
 		this._loadPromise = null;
 		this._items = [];
 	}
 	async get(position) {
+		if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
 		let item = this._getOrNull(position);
 		if (item != null) {
 			return item;
 		}
-		if (position < 0 || this.size >= 0 && position >= this.size) throw "Out of Range error.";
 		await this._load();
 		return this._getOrNull(position);
 	}
@@ -449,7 +453,7 @@ AFRAME.registerComponent('media-selector', {
 		});
 
 		this._byName('parent-button').addEventListener('click', (ev) => {
-			this._openList(this.itemlist.getParentPath() || '');
+			this._openList(this.itemlist.folder.getParentPath() || '');
 		});
 
 		this._byName('sort-option').setAttribute('values', ["Name", "Update", "Size", "Type"].join(","));
@@ -482,23 +486,22 @@ AFRAME.registerComponent('media-selector', {
 	},
 	_loadList(path) {
 		this.itemlist.onupdate = null;
-		let list = storageList.getFolder(path);
-		if (list == null) {
+		let folder = storageList.getFolder(path);
+		if (folder == null) {
 			return;
 		}
-		if (list.randomAccess === false) {
-			this.itemlist = new ArrayFolderLoader(list, { orderBy: this.data.sortField, order: this.data.sortOrder });
+		if (folder.sequentialAccess) {
+			this.itemlist = new ArrayFolderLoader(folder, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
 		} else {
-			this.itemlist = new CachedFolderLoader(list, { orderBy: this.data.sortField, order: this.data.sortOrder });
+			this.itemlist = new CachedFolderLoader(folder, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
 		}
 
 		this.el.setAttribute("title", "Loading...");
 		let mediaList = this._byName('medialist').components.xylist;
 		mediaList.setContents([]);
 		this.itemlist.getInfo().then((info) => {
-			let p = storageList.parsePath(path).pop();
 			this.item.path = path;
-			this.item.name = info.name || p[1] || p[0];
+			this.item.name = info.name;
 			this.item.thumbnailUrl = info.thumbnailUrl;
 			mediaList.setContents(this.itemlist, this.itemlist.size);
 			this.itemlist.onupdate = () => {

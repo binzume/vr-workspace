@@ -60,17 +60,16 @@ export class WebkitFileSystemWrapper {
 }
 
 class WebkitFileSystemWrapperFileList {
-    constructor(folder, storage, prefix = '') {
+    constructor(path, storage, prefix = '') {
         this._storage = storage;
         this._pathPrefix = prefix;
-        this._folder = folder;
-        this.itemPath = folder;
+        this._path = path;
         this.items = [];
         this.size = -1;
     }
 
     async init() {
-        let entries = await this._storage.entries(this._folder);
+        let entries = await this._storage.entries(this._path);
         let getFile = (ent) => ent.isFile ? new Promise((resolve, reject) => ent.file(resolve, reject)) : Promise.resolve(null);
         let files = await Promise.all(entries.map(async (entry) => {
             return [entry, await getFile(entry)];
@@ -118,14 +117,14 @@ class WebkitFileSystemWrapperFileList {
     }
 
     writeFile(name, blob) {
-        return this._storage.writeFile(this.itemPath + '/' + name, blob);
+        return this._storage.writeFile(this._path + '/' + name, blob);
     }
 
     getParentPath() {
-        if (this.itemPath == '' || this.itemPath == '/') {
+        if (this._path == '' || this._path == '/') {
             return null;
         }
-        return this._pathPrefix + this.itemPath.substring(0, this.itemPath.lastIndexOf('/'));
+        return this._pathPrefix + this._path.substring(0, this._path.lastIndexOf('/'));
     }
 }
 
@@ -151,8 +150,6 @@ export async function install() {
     globalThis.storageAccessors = globalThis.storageAccessors || {};
     globalThis.storageAccessors['WebkitFileSystem'] = {
         name: "Local",
-        root: '',
-        writable: true,
         getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
     };

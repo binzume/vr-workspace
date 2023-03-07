@@ -1,12 +1,13 @@
 
 class BaseFileList {
     /**
-     * @param {string} itemPath
+     * @param {string} path
+     * @param {string} name
      */
-    constructor(itemPath) {
-        this.itemPath = itemPath;
+    constructor(path, name) {
+        this._path = path;
+        this._name = name;
         this.size = -1;
-        this.name = "";
         this.onupdate = null;
     }
     notifyUpdate() {
@@ -17,15 +18,14 @@ class BaseFileList {
     }
 }
 
-class ItemList extends BaseFileList {
+class JsonFileList extends BaseFileList {
     /**
-     * @param {string} apiUrl
-     * @param {string} itemPath
+     * @param {string} url
+     * @param {string} path
      */
-    constructor(apiUrl, itemPath, prefix = '') {
-        super(itemPath);
-        this.apiUrl = apiUrl;
-        this.name = itemPath;
+    constructor(url, path, prefix = '') {
+        super(path, path);
+        this._url = url;
         this._pathPrefix = prefix;
     }
 
@@ -34,14 +34,14 @@ class ItemList extends BaseFileList {
         let params = "?offset=" + offset + "&limit=" + limit;
         if (options.orderBy) params += "&orderBy=" + options.orderBy;
         if (options.order) params += "&order=" + options.order;
-        let response = await fetch(this.apiUrl + this.itemPath + params, { signal: signal });
+        let response = await fetch(this._url + params, { signal: signal });
         if (!response.ok) {
             throw "fetch error";
         }
         let result = await response.json();
         signal?.throwIfAborted();
 
-        let baseUrl = (this.apiUrl + this.itemPath).replace(/[^/]+$/, '');
+        let baseUrl = (this._url).replace(/[^/]+$/, '');
         let convUrl = (path) => {
             if (path == null || path.includes('://')) return path;
             if (!path.startsWith('/')) {
@@ -63,7 +63,7 @@ class ItemList extends BaseFileList {
             }
         }
         this.size = result.total || (offset + result.items.length);
-        this.name = result.name || this.itemPath;
+        this._name = result.name || this._path;
         return {
             items: result.items,
             next: result.more ? offset + result.items.length : null,
@@ -72,30 +72,38 @@ class ItemList extends BaseFileList {
     }
 
     getParentPath() {
-        let p = this.itemPath.lastIndexOf('/');
+        let p = this._path.lastIndexOf('/');
         if (p < 0) {
             return null;
         }
-        return this._pathPrefix + this.itemPath.substring(0, p);
+        return this._pathPrefix + this._path.substring(0, p);
+    }
+
+    async getInfo() {
+        return {
+            type: 'folder',
+            name: this._name,
+        };
     }
 }
 
 class ArrayFileList extends BaseFileList {
-    constructor(items, itemPath, prefix = '') {
-        super(itemPath);
+    constructor(items, path, name = '', prefix = '') {
+        super(path, name);
         this._pathPrefix = prefix;
         this.setItems(items);
     }
     async getInfo() {
         return {
             type: 'folder',
-            name: this.name,
+            name: this._name,
             size: this.items.length,
         };
     }
     setItems(items) {
         this.items = items;
         this.size = this.items.length;
+        this.notifyUpdate();
     }
     contains(item) {
         return this.items.some(i => i.path === item.path);
@@ -123,73 +131,65 @@ class ArrayFileList extends BaseFileList {
 }
 
 class LocalList extends ArrayFileList {
-    constructor(listName, prefix = '') {
+    constructor(listName, name, prefix = '') {
         let items = [];
         let s = localStorage.getItem(listName);
         if (s !== null) {
             items = JSON.parse(s);
         }
-        super(items, listName, prefix);
-        this.name = "Favorites";
+        super(items, listName, name, prefix);
     }
     addItem(item) {
         if (this.contains(item)) return;
         this.items.push(item);
         this.setItems(this.items);
-        localStorage.setItem(this.itemPath, JSON.stringify(this.items));
-        this.notifyUpdate();
     }
     removeItem(item) {
-        let path = item.path;
-        this.items = this.items.filter(i => i.path != path);
+        this.items = this.items.filter(i => i.path != item.path);
         this.setItems(this.items);
-        localStorage.setItem(this.itemPath, JSON.stringify(this.items));
-        this.notifyUpdate();
     }
     clear() {
-        this.items = [];
-        this.size = 0;
-        localStorage.removeItem(this.itemPath);
-        this.notifyUpdate();
+        this.setItems([]);
+    }
+    setItems(items) {
+        items.length ? localStorage.setItem(this._path, JSON.stringify(items)) : localStorage.removeItem(this._path);
+        super.setItems(items);
     }
 }
 
 
 class StorageList extends ArrayFileList {
+    /**
+     * @param {Record<string, StorageEntry>} accessors 
+     */
     constructor(accessors) {
-        super([], '');
+        super([], '', 'Storage');
         this.accessors = accessors || {};
-        this.name = "Storage";
         this._update();
     }
     _update() {
         /** @type {object[]} */
         let items = [];
         for (let [k, sa] of Object.entries(this.accessors)) {
-            if (sa == this) {
-                continue;
-            }
-            if (sa.shortcuts && Object.keys(sa.shortcuts).length) {
-                Object.keys(sa.shortcuts).forEach(n => {
-                    items.push({ name: n, type: 'folder', path: k + '/' + sa.shortcuts[n], updatedTime: '' });
+            if (sa.entrypoints && Object.keys(sa.entrypoints).length) {
+                Object.keys(sa.entrypoints).forEach(n => {
+                    items.push({ name: n, type: 'folder', path: k + '/' + sa.entrypoints[n], updatedTime: '' });
                 });
             } else {
-                items.push({ name: sa.name, type: 'folder', path: k + '/' + sa.root, updatedTime: '' });
+                let path = sa.root ? '/' + sa.root : '';
+                items.push({ name: sa.name, type: 'folder', path: k + path, updatedTime: '' });
             }
         }
-        this.items = items;
-        this.size = items.length;
+        this.setItems(items);
     }
     addStorage(id, data) {
         this.accessors[id] = data;
         this._update();
-        this.notifyUpdate();
     }
     removeStorage(id) {
         if (!this.accessors[id]) { return false; }
         delete this.accessors[id];
         this._update();
-        this.notifyUpdate();
         return true;
     }
     getFolder(path, prefix = '') {
@@ -232,9 +232,7 @@ class StorageList extends ArrayFileList {
 
     globalThis.storageAccessors['Favs'] = {
         name: "Favorites",
-        root: "favoriteItems",
-        shortcuts: {},
-        getFolder: (folder, prefix) => new LocalList(folder, prefix),
+        getFolder: (folder, prefix) => new LocalList(folder, 'Favorites', prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
 
@@ -242,17 +240,15 @@ class StorageList extends ArrayFileList {
     if (!location.href.includes('.github.io')) {
         globalThis.storageAccessors['MEDIA'] = {
             name: "Media",
-            root: "tags",
-            shortcuts: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
-            getFolder: (folder, prefix) => new ItemList("../api/", folder, prefix),
+            entrypoints: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
+            getFolder: (path, prefix) => new JsonFileList('../api/' + path, path, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
     }
     globalThis.storageAccessors['DEMO'] = {
         name: "Demo",
         root: "list.json",
-        shortcuts: {},
-        getFolder: (folder, prefix) => new ItemList("https://binzume.github.io/demo-assets/", folder, undefined, prefix),
+        getFolder: (folder, prefix) => new JsonFileList("https://binzume.github.io/demo-assets/" + folder, folder, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
     return true;

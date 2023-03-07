@@ -98,27 +98,28 @@ export class GoogleDrive {
     }
 }
 class GoogleDriveFileList {
-    constructor(folderId, options, drive, pathPrefix) {
-        this.itemPath = folderId;
-        this.name = "";
-        this.thumbnailUrl = null;
+    constructor(folderId, drive, pathPrefix) {
+        this._folderId = folderId;
+        this._name = "";
+        this._parent = null;
         /** @type {GoogleDrive} */
         this.drive = drive;
-        this.parent = null;
         this.onupdate = null;
-        this.randomAccess = false;
+        this.sequentialAccess = true;
         this._pathPrefix = pathPrefix;
     }
     async getInfo() {
-        await this.drive.getFile(this.itemPath).then(f => {
-            this.name = f.name;
-            if (f.parents && f.parents.length > 0) {
-                this.parent = f.parents[0];
-            }
-        });
+        if (!this._name) {
+            await this.drive.getFile(this._folderId).then(f => {
+                this._name = f.name;
+                if (f.parents && f.parents.length > 0) {
+                    this._parent = f.parents[0];
+                }
+            });
+        }
         return {
             type: 'folder',
-            name: this.name,
+            name: this._name,
         };
     }
     async getFiles(offset, limit, options = null, signal = null) {
@@ -129,7 +130,7 @@ class GoogleDriveFileList {
         } else if (options.orderBy == "updated") {
             driveOption.orderBy = "modifiedTime" + (options.order == "d" ? " desc" : "");
         }
-        let result = await this.drive.getFiles(this.itemPath, limit, offset ? offset : null, driveOption);
+        let result = await this.drive.getFiles(this._folderId, limit, offset ? offset : null, driveOption);
         signal?.throwIfAborted();
         let drive = this.drive;
         let files = result.files.map(f => ({
@@ -139,7 +140,7 @@ class GoogleDriveFileList {
             path: this._pathPrefix + f.id,
             name: f.name,
             size: f.size,
-            tags: [this.itemPath],
+            tags: [this._folderId],
             thumbnailUrl: (f.thumbnailLink && !f.thumbnailLink.startsWith("https://docs.google.com/")) ? f.thumbnailLink : null,
             updatedTime: f.modifiedTime,
             fetch(start, end) { return drive.fetch(this.id, start, end); },
@@ -156,12 +157,12 @@ class GoogleDriveFileList {
      * @param {Blob} blob 
      */
     async writeFile(name, blob) {
-        let f = await this.drive.create(name, '', blob.type, this.itemPath);
+        let f = await this.drive.create(name, '', blob.type, this._folderId);
         console.log(JSON.parse(f.body));
         return await this.drive.update(JSON.parse(f.body).id, blob);
     }
     getParentPath() {
-        return this._pathPrefix + this.parent;
+        return this._parent && this._pathPrefix + this._parent;
     }
 }
 
@@ -221,8 +222,7 @@ export async function install() {
     globalThis.storageAccessors["GoogleDrive"] = {
         name: "Google Drive",
         root: 'root',
-        shortcuts: {},
-        getFolder: (folder, prefix) => new GoogleDriveFileList(folder, {}, drive, prefix),
+        getFolder: (folder, prefix) => new GoogleDriveFileList(folder, drive, prefix),
         parsePath: (path) => path ? [[path]] : []
     };
     return true;
