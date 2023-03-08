@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>taskmgr</title>
+  <script id='script-aframe' src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="taskmgr.js"></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene>
+    <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable"></a-entity>
+
+    <a-xywindow id="app" task-manager position="0 1 -1" scale="0.15 0.15 0.15" title="Task Manager" width="6" height="4"
+      xywindow="background:true" xycontainer="direction:row;spacing:0.1">
+
+
+      <a-xycontainer width="6" height="4" direction="column" align-items="center">
+        <a-xycontainer width="6" height="0.4" direction="row" align-items="center">
+          <a-xylabel value="Running apps" width="2" height="0.4"></a-xylabel>
+          <a-xybutton name="refresh-button" label="Refresh" width="1.5" height="0.4"></a-xybutton>
+          <a-xybutton name="kill-all-button" label="Kill All" width="1.5" height="0.4"></a-xybutton>
+        </a-xycontainer>
+        <a-xyscroll width=6 height=3.6 scrollbar=false>
+          <a-entity name="running-app-list" xylist="itemHeight:0.41" xyrect="width:3"></a-entity>
+        </a-xyscroll>
+      </a-xycontainer>
+
+    </a-xywindow>
+
+    <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
