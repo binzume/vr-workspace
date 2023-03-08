@@ -14,19 +14,15 @@
     <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable"></a-entity>
 
     <a-xywindow id="app" task-manager position="0 1 -1" scale="0.15 0.15 0.15" title="Task Manager" width="6" height="4"
-      xywindow="background:true" xycontainer="direction:row;spacing:0.1">
+      xywindow="background:true" xycontainer="direction:column;spacing:0.1">
 
-
-      <a-xycontainer width="6" height="4" direction="column" align-items="center">
-        <a-xycontainer width="6" height="0.4" direction="row" align-items="center">
-          <a-xylabel value="Running apps" width="2" height="0.4"></a-xylabel>
-          <a-xybutton name="refresh-button" label="Refresh" width="1.5" height="0.4"></a-xybutton>
-          <a-xybutton name="kill-all-button" label="Kill All" width="1.5" height="0.4"></a-xybutton>
-        </a-xycontainer>
-        <a-xyscroll width=6 height=3.6 scrollbar=false>
-          <a-entity name="running-app-list" xylist="itemHeight:0.41" xyrect="width:3"></a-entity>
-        </a-xyscroll>
+      <a-xycontainer width="6" height="0.4" direction="row" align-items="center">
+        <a-xylabel value="Running apps" width="5" height="0.4"></a-xylabel>
+        <a-xybutton name="kill-all-button" label="Kill All" width="1.0" height="0.4"></a-xybutton>
       </a-xycontainer>
+      <a-xyscroll width=6 height=3.6 scrollbar=false>
+        <a-entity name="running-app-list" xylist="itemHeight:0.41" xyrect="width:6"></a-entity>
+      </a-xyscroll>
 
     </a-xywindow>
 
