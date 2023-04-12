@@ -6,13 +6,14 @@ WebVR/WebXRで色々試すための環境です．
 
 https://binzume.github.io/vr-workspace/
 
-OculusQuest等で上記URLにアクセスして `VR` ボタンをクリックしてください．
+OculusQuest等で上記URLにアクセスして `VR` または `AR` ボタンをクリックしてください．
 
 - コントローラのトリガーボタンがクリック，グリップボタンがメニュー表示とジェスチャー入力です
 - ウインドウ等のドラッグ中にグリップボタンを押すと対象との距離を操作できます
-- Google Drive上のファイルを使いたい場合は事前に 'Storage Settings' 内でアクセスを許可してください
+- Google Drive上のファイルを使いたい場合は事前に `Storage Settings` 内でアクセスを許可してください
 
-サーバ等は不要ですが，別の環境で動かしたい場合は Google API の clientId等は書き換えてください．
+サーバ等は不要ですが，WebXR Device APIを使うためには適当なHTTPサーバを用いて https:// でアクセスする必要があります。
+また、別の環境で動かしたい場合は Google API の clientId等は書き換えてください．
 
 ## Features
 
@@ -24,8 +25,9 @@ OculusQuest等で上記URLにアクセスして `VR` ボタンをクリックし
 
 - Calculator
 - Notepad
-- Console
 - Paint3D
+- Console
+- Task Manager
 - Media Player
 - Storage
   - Google Drive client
