@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Plot3D</title>
+  <script id='script-aframe' src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+  <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
+  <script src="../notepad/editor.js"></script>
+  <script src="calc3d.js"></script>
+</head>
+
+<body style="background-color: black; color:white;">
+  <a-scene>
+    <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
+
+    <a-xywindow id="app" calc3d scale='0.15 0.15 0.15' title="Calc3D" width="4" height="4.2" position="0 1 -1" xywindow="background:true">
+      <a-xycontainer direction="horizontal" width="4" height="4.2" wrap="wrap">
+        <a-texteditor name='calc3d-input' width="3.8" height="1"></a-texteditor>
+
+        <a-xycontainer direction="horizontal" width="2.5" height="3" wrap="wrap">
+          <a-xybutton class='calc3d-button' label="x" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="y" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="z" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="r" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label=":=" width="0.5" height="0.3"></a-xybutton>
+
+          <a-xybutton class='calc3d-button' label="pi" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="e" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="(" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label=")" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label=";" width="0.5" height="0.3"></a-xybutton>
+
+          <a-xybutton class='calc3d-button' label="sin(" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="cos(" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="tan(" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="log(" width="0.5" height="0.3"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="abs(" width="0.5" height="0.3"></a-xybutton>
+
+          <a-xybutton class='calc3d-button' label="7" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="8" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="9" width="0.5"></a-xybutton>
+          <a-xybutton name="del-button" label="DEL" width="0.5"></a-xybutton>
+          <a-xybutton name="clear-button" label="AC" width="0.5"></a-xybutton>
+
+          <a-xybutton class='calc3d-button' label="4" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="5" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="6" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="*" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="/" width="0.5"></a-xybutton>
+  
+          <a-xybutton class='calc3d-button' label="1" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="2" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="3" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="+" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="-" width="0.5"></a-xybutton>
+  
+          <a-xybutton class='calc3d-button' label="0" width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="." width="0.5"></a-xybutton>
+          <a-xybutton class='calc3d-button' label="e" width="0.5"></a-xybutton>
+          <a-xybutton name='exe-button' label="=" width="1"></a-xybutton>
+        </a-xycontainer>
+
+        <a-xycontainer direction="column" width="1.5" height="3">
+          <a-xybutton name='mode-line' label="Lines" width="1"></a-xybutton>
+          <a-xybutton name='mode-points' label="Points" width="1"></a-xybutton>
+          <a-xybutton name='mode-faces' label="Faces" width="1"></a-xybutton>
+          <a-xybutton name='plot-button' label="Plot" width="1"></a-xybutton>
+        </a-xycontainer>
+
+      </a-xycontainer>
+    </a-xywindow>
+
+    <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
+      <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
+      <a-entity laser-controls="hand: right" raycaster="objects:.collidable"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="objects:.collidable"></a-entity>
+    </a-entity>
+
+  </a-scene>
+</body>
+
+</html>
