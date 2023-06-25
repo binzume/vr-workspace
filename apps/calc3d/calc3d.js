@@ -2,11 +2,16 @@
 
 class MeshGen {
 	constructor() {
-		this.defined = ["sin", "cos", "tan", "abs", "log", "linspace", "arange", "plot", "pi"];
+		this.alias = {
+			sin: 'Math.sin', cos: 'Math.cos', tan: 'Math.tan',
+			asin: 'Math.asin', acos: 'Math.acos', atan: 'Math.atan',
+			abs: 'Math.abs', log: 'Math.log', log10: 'Math.log10', pi: 'Math.PI', e: 'Math.E',
+			linspace: "lib.linspace", arange: "lib.arange", plot: "lib.plot"
+		};
 		this.preset = {
-			x: "arange(-1, 1, .05)",
-			y: "arange(-1, 1, .05)",
-			z: "arange(-1, 1, .05)",
+			x: "linspace(-1, 1, 41)",
+			y: "linspace(-1, 1, 41)",
+			z: "linspace(-1, 1, 41)",
 			color: "([0,1,0])",
 		};
 		this.preset2 = {
@@ -23,7 +28,7 @@ class MeshGen {
 	 * @param {string} s 
 	 */
 	getDepends(s) {
-		return Array.from(s.matchAll(/([a-z]\w*)/g)).map(a => a[1]);
+		return Array.from(s.matchAll(/((?<=(^|[^\w.]))[a-z]\w*)/g)).map(a => a[1]);
 	}
 
 	/**
@@ -36,7 +41,7 @@ class MeshGen {
 	/**
 	 * @param {string} src 
 	 */
-	parse(src) {
+	getVars(src) {
 		let vars = {};
 		for (let line of src.split(/[\n;]/)) {
 			let eq = line.split('=').map(x => x.trim());
@@ -44,17 +49,16 @@ class MeshGen {
 				vars[eq[i]] = eq[eq.length - 1];
 			}
 		}
-		return { vars };
+		return vars;
 	}
 
 	/**
-	 * @param {string} src 
+	 * @param {object} vars
 	 * @param {string} exp 
 	 */
-	compile(src, exp) {
-		let { vars } = this.parse(src);
+	compile(vars, exp, preloop) {
 		vars = Object.assign({}, vars['r'] ? this.preset2 : this.preset, vars);
-		let resolved = [...this.defined];
+		let resolved = Object.keys(this.alias);
 		let lines = [];
 		let nest = 0;
 		let resolve = (name) => {
@@ -66,6 +70,7 @@ class MeshGen {
 				resolve(r);
 			}
 			if (this.isArray(e)) {
+				preloop && lines.push("  ".repeat(nest) + preloop);
 				lines.push("  ".repeat(nest) + `for (let ${name} of ${e}) {`);
 				nest++;
 			} else {
@@ -76,23 +81,24 @@ class MeshGen {
 		this.getDepends(exp).forEach(resolve);
 		lines.push("  ".repeat(nest) + exp + ";");
 		lines.push("}".repeat(nest));
-		return lines.join("\n");
+		// @ts-ignore
+		return lines.join("\n").replaceAll(/(?<=(^|[^\w.]))[a-z]\w*/g, s => this.alias[s] || s);
 	}
 	run(src, plot, exp, reset) {
-		const pi = Math.PI, e = Math.E, sin = Math.sin, cos = Math.cos, tan = Math.tan, abs = Math.abs, log = Math.log;
-		function* linspace(min, max, count) {
-			reset?.();
-			for (let i = 0; i < count; i++) {
-				yield min + (max - min) * i / (count - 1);
-			}
-		}
-		function* arange(start = 0, end = 100, step = 1) {
-			reset?.();
-			for (let i = start; i < end; i += step) {
-				yield i;
-			}
-		}
-		return eval(this.compile(src, exp));
+		const lib = {
+			linspace: function* (min, max, count = 100) {
+				for (let i = 0; i < count; i++) {
+					yield min + (max - min) * i / (count - 1);
+				}
+			},
+			arange: function* (start = 0, end = 100, step = 1) {
+				for (let i = start; i < end; i += step) {
+					yield i;
+				}
+			},
+			plot: plot
+		};
+		return eval(this.compile(this.getVars(src), exp, reset ? 'reset()' : ''));
 	}
 
 	/**
@@ -156,13 +162,22 @@ class MeshGen {
 AFRAME.registerComponent('calc3d', {
 	schema: {},
 	init() {
-		let table = { ':=': '=', ';': "\n" };
+		let replace = { ':=': '=' };
+		/** @type {import("aframe").Entity<any> & {value: string}} */
 		let inputEl = this._elByName('calc3d-input');
 		let targetEl = this.el.sceneEl; // TODO
+		inputEl.addEventListener('change', () => {
+			let lines = inputEl.value.split('\n');
+			if (lines[lines.length - 1].includes("=")) {
+				this._elByName('exe-button').setAttribute('label', 'Ent');
+			} else {
+				this._elByName('exe-button').setAttribute('label', '=');
+			}
+		});
 		for (let b of this.el.querySelectorAll('.calc3d-button')) {
 			b.addEventListener('click', ev => {
 				let s = b.getAttribute('label');
-				inputEl.value += table[s] || s;
+				inputEl.value += replace[s] || s;
 				let editor = inputEl.components.texteditor;
 				editor && editor.caret.move(0, s.length);
 				inputEl.focus();
@@ -179,8 +194,16 @@ AFRAME.registerComponent('calc3d', {
 			let meshGen = new MeshGen();
 			let src = inputEl.value.trim();
 			let lines = src.split('\n');
-			let result = meshGen.run(src, null, lines[lines.length - 1]);
-			if (result != null) { inputEl.value = src + "\n> " + result + "\n"; }
+			if (lines[lines.length - 1].includes("=") || lines[lines.length - 1].includes("->")) {
+				inputEl.value = src + "\n";
+			} else {
+				try {
+					let result = meshGen.run(src, null, lines[lines.length - 1]);
+					if (result != null) { inputEl.value = src + "\n-> " + result + "\n"; }
+				} catch (e) {
+					inputEl.value = src + "\n-> Err\n";
+				}
+			}
 			let editor = inputEl.components.texteditor;
 			editor && editor.caret.move(999, 0);
 			inputEl.focus();
