@@ -57,6 +57,7 @@ class MultilineText {
 		this.scrollX = 0;
 		this.caret = null;
 		this.selection = null;
+		this.textChanged = null;
 		this._maxWidth = 0;
 		this._textureLines = [];
 		this._textureFreeLines = [];
@@ -122,6 +123,7 @@ class MultilineText {
 		this.scrollX = 0;
 		this.selection = null;
 		this.refresh();
+		this.textChanged && this.textChanged();
 	}
 
 	getText() {
@@ -405,6 +407,7 @@ class MultilineText {
 		if (line.visible) {
 			this._drawLine(line, l);
 		}
+		this.textChanged && this.textChanged();
 	}
 
 	_getCol(l, x) {
@@ -503,6 +506,7 @@ AFRAME.registerComponent('texteditor', {
 		this.textView = new MultilineText(xyrect.width, xyrect.height, lineHeight, { font: data.font });
 		if (data.editable) {
 			this.caret = this.textView.caret = new MultilineTextCaret(lineHeight * 0.1, lineHeight * 0.9, this.data.caretColor, this.textView);
+			this.textView.textChanged = () => el.emit('change', {});
 		}
 
 		el.setObject3D('texteditor-text', this.textView.object3D);
