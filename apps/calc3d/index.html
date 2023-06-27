@@ -14,7 +14,7 @@
   <a-scene>
     <a-entity cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
-    <a-xywindow id="app" calc3d scale='0.15 0.15 0.15' title="Calc3D" width="4" height="4.2" position="0 1 -1" xywindow="background:true">
+    <a-xywindow id="app" calc3d scale='0.15 0.15 0.15' title="Calc3D" width="4" height="4.2" position="0 1.4 -1" xywindow="background:true">
       <a-xycontainer direction="horizontal" width="4" height="4.2" wrap="wrap">
         <a-texteditor name='calc3d-input' width="3.8" height="1"></a-texteditor>
 
@@ -61,10 +61,13 @@
           <a-xybutton name='exe-button' label="=" width="1"></a-xybutton>
         </a-xycontainer>
 
-        <a-xycontainer direction="column" width="1.5" height="3">
-          <a-xybutton name='mode-line' label="Lines" width="1"></a-xybutton>
-          <a-xybutton name='mode-points' label="Points" width="1"></a-xybutton>
-          <a-xybutton name='mode-faces' label="Faces" width="1"></a-xybutton>
+        <a-xycontainer direction="column" width="1.5" height="3" align-items="center">
+          <a-xyscroll width=1.5 height=1.5 scrollbar=false>
+            <a-entity name="variables-list" xylist="itemHeight:0.28"></a-entity>
+          </a-xyscroll>    
+          <a-xybutton name='mode-line' label="Lines" width="1" height="0.3"></a-xybutton>
+          <a-xybutton name='mode-points' label="Points" width="1" height="0.3"></a-xybutton>
+          <a-xybutton name='mode-faces' label="Faces" width="1" height="0.3"></a-xybutton>
           <a-xybutton name='plot-button' label="Plot" width="1"></a-xybutton>
         </a-xycontainer>
 

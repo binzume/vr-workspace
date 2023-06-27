@@ -41,15 +41,20 @@ class MeshGen {
 	/**
 	 * @param {string} src 
 	 */
-	getVars(src) {
-		let vars = {};
+	parseVarAssign(src, vars = {}) {
+		let changed = false;
 		for (let line of src.split(/[\n;]/)) {
 			let eq = line.split('=').map(x => x.trim());
 			for (let i = 0; i < eq.length - 1; i++) {
-				vars[eq[i]] = eq[eq.length - 1];
+				let v = eq[eq.length - 1];
+				if (!eq[i].match(/^[a-z]\w*$/) || v == '') { continue; }
+				if (vars[eq[i]] != v) {
+					vars[eq[i]] = v;
+					changed = true;
+				}
 			}
 		}
-		return vars;
+		return changed;
 	}
 
 	/**
@@ -84,7 +89,7 @@ class MeshGen {
 		// @ts-ignore
 		return lines.join("\n").replaceAll(/(?<=(^|[^\w.]))[a-z]\w*/g, s => this.alias[s] || s);
 	}
-	run(src, plot, exp, reset) {
+	run(vars, plot, exp, reset) {
 		const lib = {
 			linspace: function* (min, max, count = 100) {
 				for (let i = 0; i < count; i++) {
@@ -98,13 +103,10 @@ class MeshGen {
 			},
 			plot: plot
 		};
-		return eval(this.compile(this.getVars(src), exp, reset ? 'reset()' : ''));
+		return eval(this.compile(vars, exp, reset ? 'reset()' : ''));
 	}
 
-	/**
-	 * @param {string} src 
-	 */
-	getPoints(src, options = {}) {
+	getPoints(vars, options = {}) {
 		const points = [];
 		const colors = [];
 		let lastReset = 0;
@@ -114,7 +116,7 @@ class MeshGen {
 			if (c) { colors.push(c); }
 			points.push(p);
 		}
-		this.run(src, add_point, options.color ? "plot([x,y,z], color)" : "plot([x,y,z])", () => lastReset = points.length);
+		this.run(vars, add_point, options.color ? "plot([x,y,z], color)" : "plot([x,y,z])", () => lastReset = points.length);
 		let result = { position: points };
 		if (options.color) {
 			result.color = colors;
@@ -164,14 +166,59 @@ AFRAME.registerComponent('calc3d', {
 	init() {
 		let replace = { ':=': '=' };
 		/** @type {import("aframe").Entity<any> & {value: string}} */
+		// @ts-ignore
 		let inputEl = this._elByName('calc3d-input');
 		let targetEl = this.el.sceneEl; // TODO
+		let vars = {}, varsArray = [];
+		let varsList = this._elByName('variables-list').components.xylist;;
+		let updateVarList = () => {
+			varsArray = Object.entries(vars);
+			varsList.setContents(varsArray, varsArray.length);
+		};
+		varsList.setAdapter({
+			create() {
+				let el = document.createElement('a-xybutton');
+				el.setAttribute('width', 1.45);
+				el.setAttribute('height', 0.25);
+				el.setAttribute('xyrect', { width: 1.5 });
+				el.setAttribute('color', 'black');
+				el.setAttribute('xylabel', { wrapCount: 14, align: 'left', renderingMode: 'canvas' });
+				let deleteButton = document.createElement('a-xybutton');
+				deleteButton.setAttribute('width', 0.25);
+				deleteButton.setAttribute('height', 0.25);
+				deleteButton.setAttribute('position', { x: 0.6, y: 0, z: 0.05 });
+				deleteButton.setAttribute('label', "X");
+				deleteButton.addEventListener('click', (ev) => {
+					delete vars[varsArray[el.dataset.index][0]];
+					updateVarList();
+				});
+				el.appendChild(deleteButton);
+				return el;
+			},
+			bind(position, el, contents) {
+				el.dataset.index = position;
+				el.setAttribute('xylabel', { value: varsArray[position].join('=') });
+			}
+		});
 		inputEl.addEventListener('change', () => {
 			let lines = inputEl.value.split('\n');
+			let editor = inputEl.components.texteditor;
+			if (editor && editor.caret.position.line < lines.length) {
+				if (meshGen.parseVarAssign(lines[editor.caret.position.line], vars)) {
+					updateVarList();
+				}
+			}
+
 			if (lines[lines.length - 1].includes("=")) {
 				this._elByName('exe-button').setAttribute('label', 'Ent');
 			} else {
 				this._elByName('exe-button').setAttribute('label', '=');
+			}
+		});
+		inputEl.addEventListener('keydown', (ev) => {
+			if (ev.code == 'Enter') {
+				let lines = inputEl.value.trim().split('\n');
+				exec(lines[lines.length - 1]);
 			}
 		});
 		for (let b of this.el.querySelectorAll('.calc3d-button')) {
@@ -189,27 +236,40 @@ AFRAME.registerComponent('calc3d', {
 		this._elByName('clear-button').addEventListener('click', ev => {
 			inputEl.value = '';
 			this.el.sceneEl.removeAttribute('calc3d-canvas');
+			vars = {};
+			updateVarList();
 		});
-		this._elByName('exe-button').addEventListener('click', ev => {
-			let meshGen = new MeshGen();
-			let src = inputEl.value.trim();
-			let lines = src.split('\n');
-			if (lines[lines.length - 1].includes("=") || lines[lines.length - 1].includes("->")) {
-				inputEl.value = src + "\n";
+		let meshGen = new MeshGen();
+		let exec = (line) => {
+			if (line.includes("->") || line.includes('=')) {
 			} else {
 				try {
-					let result = meshGen.run(src, null, lines[lines.length - 1]);
-					if (result != null) { inputEl.value = src + "\n-> " + result + "\n"; }
+					let result = meshGen.run(vars, null, line);
+					if (result != null) { inputEl.value += " -> " + result + "\n"; }
 				} catch (e) {
-					inputEl.value = src + "\n-> Err\n";
+					inputEl.value += " -> Err\n";
 				}
 			}
 			let editor = inputEl.components.texteditor;
 			editor && editor.caret.move(999, 0);
 			inputEl.focus();
+		};
+		this._elByName('exe-button').addEventListener('click', ev => {
+			let src = inputEl.value;
+			if (!src.endsWith("\n")) {
+				inputEl.value = src + "\n";
+				let lines = src.split('\n');
+				exec(lines[lines.length - 1]);
+			}
 		});
 		this._elByName('plot-button').addEventListener('click', ev => {
-			targetEl.setAttribute('calc3d-canvas', { src: inputEl.value });
+			let meshGen = new MeshGen();
+			let src = inputEl.value;
+			let lines = src.split('\n');
+			let lastLine = lines[lines.length - 1];
+			meshGen.parseVarAssign(lastLine, vars);
+			updateVarList();
+			targetEl.setAttribute('calc3d-canvas', { src: varsArray.map(kv => kv.join('=')).join("\n") });
 		});
 		this._elByName('mode-line').addEventListener('click', ev => {
 			targetEl.setAttribute('calc3d-canvas', { mode: 'line' });
@@ -249,7 +309,9 @@ AFRAME.registerComponent('calc3d-canvas', {
 		}
 		if (src.trim() == '') { return; }
 		let meshGen = new MeshGen();
-		let figure = meshGen.getPoints(src, { wire: mode == 'line', mesh: mode == 'mesh' });
+		let vars = {};
+		meshGen.parseVarAssign(src, vars);
+		let figure = meshGen.getPoints(vars, { wire: mode == 'line', mesh: mode == 'mesh' });
 		const geometry = new THREE.BufferGeometry();
 		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(figure.position.flat(1)), 3));
 		if (mode == 'line') {
