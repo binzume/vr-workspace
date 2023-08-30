@@ -28,7 +28,7 @@ class AppManager {
 				let type = el.dataset.apptype || 'app';
 				let contentTypes = el.dataset.contentType?.split(',') ?? [];
 				let hidden = el.classList.contains('hidden');
-				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.href, hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes };
+				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.getAttribute('href'), hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes };
 				apps.push(app);
 			}
 		}
@@ -80,12 +80,11 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
+		let onlaunch = () => el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
-			el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content }, false);
+			onlaunch();
 		} else {
-			el.addEventListener('loaded', (ev) => {
-				el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content }, false);
-			}, { once: true });
+			el.addEventListener('loaded', (ev) => onlaunch(), { once: true });
 		}
 		return el;
 	}
@@ -287,6 +286,34 @@ class AppManager {
 	 */
 	getRunningApps(sceneEl = null) {
 		return (sceneEl || document).querySelectorAll('[vrapp]');
+	}
+
+	/**
+	 * @param {Element} sceneEl
+	 */
+	saveWorkspace(sceneEl = null) {
+		let apps = [];
+		for (let appEl of this.getRunningApps(sceneEl)) {
+			let ent = {
+				id: appEl.components.vrapp.app.id, state: null,
+				p: Object.assign({}, appEl.getAttribute('position')),
+				r: Object.assign({}, appEl.getAttribute('rotation')),
+			};
+			apps.push(ent);
+			appEl.emit('app-save-state', { setState: (s) => ent.state = s }, false);
+		}
+		return apps;
+	}
+
+	/**
+	 * @param {Element} sceneEl
+	 */
+	async restoreWorkspace(state, sceneEl = null) {
+		for (let s of state) {
+			let el = await this.launch(s.id, sceneEl, {restoreState: s.state, disableWindowLocator: true});
+			el.setAttribute('position', s.p);
+			el.setAttribute('rotation', s.r);
+		}
 	}
 
 	/**
