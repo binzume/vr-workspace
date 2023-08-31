@@ -188,7 +188,7 @@ class AppManager {
 			let baseEl = doc.createElement('base');
 			baseEl.setAttribute('href', srcUrl);
 			doc.head.append(baseEl);
-			base = new URL(srcUrl);
+			base = new URL(srcUrl, location.href);
 
 			for (let script of /** @type {NodeListOf<HTMLScriptElement>} */(doc.querySelectorAll('head>script'))) {
 				await this._procScriptEl(script, srcUrl);
