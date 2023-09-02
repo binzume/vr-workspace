@@ -295,14 +295,16 @@ class AppManager {
 		let apps = [];
 		for (let appEl of this.getRunningApps(sceneEl)) {
 			let ent = {
-				id: appEl.components.vrapp.app.id, state: null,
+				id: appEl.components.vrapp.app.id,
+				args: appEl.components.vrapp.args,
+				state: null,
 				p: Object.assign({}, appEl.getAttribute('position')),
 				r: Object.assign({}, appEl.getAttribute('rotation')),
 			};
 			apps.push(ent);
-			appEl.emit('app-save-state', { setState: (s) => ent.state = s }, false);
+			appEl.emit('app-save-state', { setState: (s) => ent.state = s, skip: () => ent.skipped = true }, false);
 		}
-		return apps;
+		return apps.filter(a => !a.skipped);
 	}
 
 	/**
@@ -310,9 +312,11 @@ class AppManager {
 	 */
 	async restoreWorkspace(state, sceneEl = null) {
 		for (let s of state) {
-			let el = await this.launch(s.id, sceneEl, {restoreState: s.state, disableWindowLocator: true});
-			el.setAttribute('position', s.p);
-			el.setAttribute('rotation', s.r);
+			let el = await this.launch(s.id, sceneEl, {restoreState: s.state, appArgs: s.args, disableWindowLocator: true});
+			if (el) {
+				el.setAttribute('position', s.p);
+				el.setAttribute('rotation', s.r);
+			}
 		}
 	}
 
@@ -333,9 +337,11 @@ AFRAME.registerComponent('vrapp', {
 		/** @type {AppManager} */
 		this.appManager = null;
 		this.app = null;
+		this.args = null;
 		this.el.addEventListener('app-launch', (ev) => {
 			this.appManager = ev.detail.appManager;
 			this.app = ev.detail.app;
+			this.args = ev.detail.args;
 		}, { once: true });
 	}
 });
@@ -754,8 +760,8 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		// Deprecated
 		m = fragment.match(/list:(.+)/);
 		if (m) {
-			let mediaList = await window.appManager.launch('app-media-selector');
-			mediaList.setAttribute('media-selector', { path: 'MEDIA/' + m[1], sortField: 'updated', sortOrder: 'd' });
+			let path =  'MEDIA/' + m[1];
+			let mediaList = await window.appManager.launch('app-media-selector', null, {appArgs: path});
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);

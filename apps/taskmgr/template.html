@@ -17,19 +17,20 @@
       xywindow="background:true" xycontainer="direction:column;spacing:0.1">
 
       <a-xycontainer width="6" height="0.4" direction="row" align-items="center">
-        <a-xylabel value="Running apps" width="5" height="0.4"></a-xylabel>
-        <a-xybutton name="kill-all-button" label="Kill All" width="1.0" height="0.4"></a-xybutton>
+        <a-xylabel value="Running apps" width="3.2" height="0.4"></a-xylabel>
+        <a-xybutton name="save-session-button" label="Save Session" width="1" height="0.4"></a-xybutton>
+        <a-xybutton name="load-session-button" label="Load Session" width="1" height="0.4"></a-xybutton>
+        <a-xybutton name="kill-all-button" label="Kill All" width="0.8" height="0.4"></a-xybutton>
       </a-xycontainer>
       <a-xyscroll width=6 height=3.6 scrollbar=false>
         <a-entity name="running-app-list" xylist="itemHeight:0.41" xyrect="width:6"></a-entity>
       </a-xyscroll>
-
     </a-xywindow>
 
     <a-entity id="camera-rig" position-controls="arrowkeys:rotation;wasdkeys:translation">
       <a-camera position="0 1.5 0" look-controls="enabled:false"></a-camera>
-      <a-entity laser-controls="hand: right" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
-      <a-entity laser-controls="hand: left" raycaster="far:Infinity;objects:.collidable" line="color: #3060a0; opacity: 0.5"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects:.collidable"></a-entity>
+      <a-entity laser-controls="hand: left" raycaster="objects:.collidable"></a-entity>
     </a-entity>
 
   </a-scene>

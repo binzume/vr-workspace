@@ -6,6 +6,9 @@ AFRAME.registerComponent('task-manager', {
 		this.el.addEventListener('app-launch', async (ev) => {
 			this._appManager = ev.detail.appManager;
 			this._initRunningAppList();
+			this.el.addEventListener('app-save-state', async (ev) => {
+				ev.detail.skip();
+			});
 		}, { once: true });
 	},
 	remove() {
@@ -15,6 +18,18 @@ AFRAME.registerComponent('task-manager', {
 		this._elByName('kill-all-button').addEventListener('click', (ev) => {
 			this._appManager.killAll();
 		});
+		this._elByName('save-session-button').addEventListener('click', (ev) => {
+			let sessionJson = JSON.stringify(this._appManager.saveWorkspace());
+			localStorage.setItem('taskmgr-session01', sessionJson);
+			console.log(sessionJson);
+		});
+		this._elByName('load-session-button').addEventListener('click', (ev) => {
+			let sessionJson = localStorage.getItem('taskmgr-session01');
+			if (sessionJson) {
+				this._appManager.restoreWorkspace(JSON.parse(sessionJson));
+			}
+		});
+
 		this.listEl = this._elByName('running-app-list');
 		let listEl = this.listEl;
 		let list = listEl.components.xylist;
