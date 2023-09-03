@@ -263,7 +263,7 @@ AFRAME.registerComponent('media-selector', {
 		let videolist = this._byName('medialist').components.xylist;
 		let grid = this._byName('medialist').components['xylist-grid-layout'];
 
-		this.el.addEventListener('app-launch', (ev) => {
+		this.el.addEventListener('app-start', (ev) => {
 			this.appManager = ev.detail.appManager;
 			if (ev.detail.args) {
 				// TODO: parse args
@@ -474,7 +474,7 @@ AFRAME.registerComponent('media-selector', {
 	},
 	async _openList(path, openWindow) {
 		if ((openWindow || this.data.openWindow) && this.appManager) {
-			let mediaList = await this.appManager.launch('app-media-selector');
+			let mediaList = await this.appManager.start('app-media-selector');
 			let pos = new THREE.Vector3().set(this.el.getAttribute("width") * 1 + 0.3, 0, 0);
 			mediaList.setAttribute("rotation", this.el.getAttribute("rotation"));
 			mediaList.setAttribute("position", this.el.object3D.localToWorld(pos));
@@ -808,7 +808,7 @@ AFRAME.registerSystem('media-player', {
 	},
 	async playContent(item, listCursor) {
 		if (this.currentPlayer === null) {
-			(await window.appManager.launch('app-media-player')).addEventListener('loaded', e => {
+			(await window.appManager.start('app-media-player')).addEventListener('loaded', e => {
 				this.currentPlayer.playContent(item, listCursor);
 			}, { once: true });
 		} else {

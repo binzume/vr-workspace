@@ -43,7 +43,7 @@ TODO:
             editorEl.components.texteditor.caret.move(8, 0);
         });
 
-        this.el.addEventListener('app-launch', async (ev) => {
+        this.el.addEventListener('app-start', async (ev) => {
             this.appManager = ev.detail.appManager;
             this.file = ev.detail.content;
             if (this.file) {

@@ -61,11 +61,15 @@ class AppManager {
 		return [];
 	}
 
+	launch(id, sceneEl = null, options = {}) {
+		return start(id, sceneEl, options);
+	}
+
 	/**
 	 * @param {string} id 
 	 * @param {Element} sceneEl
 	 */
-	async launch(id, sceneEl = null, options = {}) {
+	async start(id, sceneEl = null, options = {}) {
 		let app = this.getAppById(id);
 		if (app == null) {
 			console.log('app not found:' + id);
@@ -80,11 +84,11 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
-		let onlaunch = () => el.emit('app-launch', { appManager: this, app: app, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
+		let onstart = () => el.emit('app-start', { appManager: this, app: app, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
-			onlaunch();
+			onstart();
 		} else {
-			el.addEventListener('loaded', (ev) => onlaunch(), { once: true });
+			el.addEventListener('loaded', (ev) => onstart(), { once: true });
 		}
 		return el;
 	}
@@ -157,7 +161,7 @@ class AppManager {
 				t.includes('*') && new RegExp(t.replace('*', '[^/]+')).test(contentType) // TODO: glob
 			));
 		if (app) {
-			this.launch(app.id, null, Object.assign({ content: content }, options));
+			this.start(app.id, null, Object.assign({ content: content }, options));
 			return true;
 		}
 		return false;
@@ -312,7 +316,7 @@ class AppManager {
 	 */
 	async restoreWorkspace(state, sceneEl = null) {
 		for (let s of state) {
-			let el = await this.launch(s.id, sceneEl, {restoreState: s.state, appArgs: s.args, disableWindowLocator: true});
+			let el = await this.start(s.id, sceneEl, {restoreState: s.state, appArgs: s.args, disableWindowLocator: true});
 			if (el) {
 				el.setAttribute('position', s.p);
 				el.setAttribute('rotation', s.r);
@@ -338,7 +342,7 @@ AFRAME.registerComponent('vrapp', {
 		this.appManager = null;
 		this.app = null;
 		this.args = null;
-		this.el.addEventListener('app-launch', (ev) => {
+		this.el.addEventListener('app-start', (ev) => {
 			this.appManager = ev.detail.appManager;
 			this.app = ev.detail.app;
 			this.args = ev.detail.args;
@@ -390,7 +394,7 @@ AFRAME.registerComponent('apps-panel', {
 		});
 		listEl.addEventListener('clickitem', async (ev) => {
 			this.el.parentNode.removeChild(this.el);
-			appManager.launch(apps[ev.detail.index].id);
+			appManager.start(apps[ev.detail.index].id);
 		});
 		list.setContents(apps);
 	},
@@ -420,7 +424,7 @@ AFRAME.registerComponent('launch-on-click', {
 	},
 	init() {
 		this.el.addEventListener('click', async (ev) => {
-			await appManager.launch(this.data.appid);
+			await appManager.start(this.data.appid);
 		});
 	}
 });
@@ -713,7 +717,7 @@ AFRAME.registerComponent('window-locator', {
 window.addEventListener('DOMContentLoaded', async (ev) => {
 	appManager.loadAppList('#applications>a');
 
-	appManager.launch('main-menu', null, { disableWindowLocator: true });
+	appManager.start('main-menu', null, { disableWindowLocator: true });
 
 	let sceneEl = document.querySelector('a-scene');
 	if (window.isSecureContext && sceneEl.components['device-orientation-permission-ui']) {
@@ -726,7 +730,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		if (ev.detail.name == 'L' || ev.detail.name == 'CLICK') {
 			let menu = sceneEl.querySelector('#mainMenu');
 			if (!menu) {
-				menu = await appManager.launch('main-menu', null, { disableWindowLocator: true });
+				menu = await appManager.start('main-menu', null, { disableWindowLocator: true });
 			}
 			let distance = 1.5;
 			let camera = sceneEl.camera;
@@ -754,14 +758,14 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		let fragment = location.hash.slice(1);
 		let m = fragment.match(/app:([\w\-]+):?(.+)?/);
 		if (m) {
-			window.appManager.launch(m[1], null, { appArgs: decodeURI(m[2]) });
+			window.appManager.start(m[1], null, { appArgs: decodeURI(m[2]) });
 		}
 
 		// Deprecated
 		m = fragment.match(/list:(.+)/);
 		if (m) {
 			let path =  'MEDIA/' + m[1];
-			let mediaList = await window.appManager.launch('app-media-selector', null, {appArgs: path});
+			let mediaList = await window.appManager.start('app-media-selector', null, {appArgs: path});
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);

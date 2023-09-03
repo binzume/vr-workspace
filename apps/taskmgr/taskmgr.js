@@ -3,7 +3,7 @@
 AFRAME.registerComponent('task-manager', {
 	schema: {},
 	init() {
-		this.el.addEventListener('app-launch', async (ev) => {
+		this.el.addEventListener('app-start', async (ev) => {
 			this._appManager = ev.detail.appManager;
 			this._initRunningAppList();
 			this.el.addEventListener('app-save-state', async (ev) => {
