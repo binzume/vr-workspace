@@ -433,7 +433,12 @@ AFRAME.registerComponent('media-selector', {
 					return t == "image" || t == "video" || t == "audio";
 				});
 				// @ts-ignore
-				this.el.sceneEl.systems["media-player"].playContent(item, cursor);
+				let mp = this.el.sceneEl.systems["media-player"];
+				if (!mp.playContent(item, cursor)) {
+					(await this.appManager.start('app-media-player')).addEventListener('loaded', e => {
+						mp.playContent(item, cursor);
+					}, { once: true });		
+				}
 			}
 		});
 
@@ -467,6 +472,9 @@ AFRAME.registerComponent('media-selector', {
 		let path = this.data.path;
 		console.log("load list: ", path);
 		this.item = { type: "list", path: path, name: path };
+		if (this.el.components.vrapp) {
+			this.el.components.vrapp.args = path;
+		}
 		this._loadList(path);
 	},
 	remove() {
@@ -570,6 +578,12 @@ AFRAME.registerComponent('media-player', {
 				}
 			}
 		});
+
+		this.el.addEventListener('app-start', (ev) => {
+			if (ev.detail.args) {
+				this.playContent(ev.detail.args.file);
+			}
+		}, { once: true });
 	},
 	update(oldData) {
 		if (this.data.src != oldData.src && this.data.src) {
@@ -609,6 +623,9 @@ AFRAME.registerComponent('media-player', {
 		console.log("play: " + f.url + " " + f.type);
 		if (this.el.components.xywindow && f.name) {
 			this.el.setAttribute("xywindow", "title", f.name);
+		}
+		if (this.el.components.vrapp && f.url) {
+			this.el.components.vrapp.args = {file: f};
 		}
 
 		clearTimeout(this.loadingTimer);
@@ -806,14 +823,12 @@ AFRAME.registerSystem('media-player', {
 			}));
 		}, 0);
 	},
-	async playContent(item, listCursor) {
-		if (this.currentPlayer === null) {
-			(await window.appManager.start('app-media-player')).addEventListener('loaded', e => {
-				this.currentPlayer.playContent(item, listCursor);
-			}, { once: true });
-		} else {
-			this.currentPlayer.playContent(item, listCursor);
+	playContent(item, listCursor) {
+		if (!this.currentPlayer) {
+			return false;
 		}
+		this.currentPlayer.playContent(item, listCursor);
+		return true;
 	},
 	registerPlayer(player) {
 		this.selectPlayer(player);
