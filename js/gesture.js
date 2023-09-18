@@ -75,7 +75,6 @@ AFRAME.registerComponent('gesture', {
         if (intersectedEl && intersectedEl.classList.contains('nogesture')) {
             return;
         }
-        let dragging = false;
         let _this = this;
         let el = this.el;
 
@@ -94,7 +93,6 @@ AFRAME.registerComponent('gesture', {
         let line = new THREE.Line(geometry, material);
         this.el.sceneEl.object3D.add(line);
 
-        let cancelEvelt = ev1 => ev1.target != ev.target && ev1.stopPropagation();
         let lastPos = null;
         let dragFun = this._dragFun = () => {
             let ray = this.el.components.raycaster.raycaster.ray;
@@ -102,10 +100,10 @@ AFRAME.registerComponent('gesture', {
             if (lastPos && lastPos.distanceTo(p) < this.data.lineDistance / 25) {
                 return;
             }
-            if (lastPos && !dragging) {
-                dragging = true;
-                window.addEventListener('mouseenter', cancelEvelt, true);
-                window.addEventListener('mouseleave', cancelEvelt, true);
+            if (lastPos && !_this.cancelEvent) {
+                this.cancelEvent = ev1 => ev1.target != ev.target && ev1.stopPropagation();
+                window.addEventListener('mouseenter', _this.cancelEvent, true);
+                window.addEventListener('mouseleave', _this.cancelEvent, true);
             }
             lastPos = p;
             if (count < maxVerts) {
@@ -129,11 +127,12 @@ AFRAME.registerComponent('gesture', {
             console.log('gesture', this.upevent);
             this._dragFun = null;
             setTimeout(() => this.el.sceneEl.object3D.remove(line), this.data.lineFadeDelayMs);
-            if (dragging) {
-                window.removeEventListener('mouseenter', cancelEvelt, true);
-                window.removeEventListener('mouseleave', cancelEvelt, true);
-            }
             dragFun();
+            if (_this.cancelEvent) {
+                window.removeEventListener('mouseenter', _this.cancelEvent, true);
+                window.removeEventListener('mouseleave', _this.cancelEvent, true);
+                _this.cancelEvent = null;
+            }
             let cameraMatInv = this.el.sceneEl.camera.matrixWorldInverse;
             points.forEach(p => p.applyMatrix4(cameraMatInv));
             let motions = this._getMotions(points);
