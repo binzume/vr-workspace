@@ -84,7 +84,8 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
-		let onstart = () => el.emit('app-start', { appManager: this, app: app, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
+		let services = {appManager: this, storageManager: globalThis.storageList};
+		let onstart = () => el.emit('app-start', { appManager: this, app: app, services: services, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
 			onstart();
 		} else {
@@ -339,11 +340,13 @@ globalThis.appManager = new AppManager();
 AFRAME.registerComponent('vrapp', {
 	init() {
 		/** @type {AppManager} */
+		this.services = {};
 		this.appManager = null;
 		this.app = null;
 		this.args = null;
 		this.el.addEventListener('app-start', (ev) => {
-			this.appManager = ev.detail.appManager;
+			this.services = ev.detail.services;
+			this.appManager = this.services.appManager;
 			this.app = ev.detail.app;
 			this.args = ev.detail.args;
 		}, { once: true });
@@ -764,7 +767,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		// Deprecated
 		m = fragment.match(/list:(.+)/);
 		if (m) {
-			let path =  'MEDIA/' + m[1];
+			let path =  'MEDIA/' + decodeURI(m[1]);
 			let mediaList = await window.appManager.start('app-media-selector', null, {appArgs: path});
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {

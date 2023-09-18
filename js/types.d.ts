@@ -10,7 +10,8 @@ declare module "aframe" {
         thumbstickmoved: DetailEvent<{ x: number, y: number }>
         object3dset: DetailEvent<{ object: any }>
         gesture: DetailEvent<{ name: string, center: any }>
-        'app-launch': DetailEvent<{ appManager: AppManager, app: any, args: any, content: any }>
+        'app-start': DetailEvent<{ appManager: AppManager, app: any, services: {appManager: AppManager, [key: string]: any}, args: any, content: any }>
+        'app-save-state': DetailEvent<{ setState: (any) => void, skip: () => void }>
     }
 
     export interface Entity {

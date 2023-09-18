@@ -23,7 +23,7 @@ AFRAME.registerComponent('vrm-select', {
 		el.addEventListener('click', ev => el.focus());
 		el.focus();
 
-		el.addEventListener('app-launch', async (ev) => {
+		el.addEventListener('app-start', async (ev) => {
 			let content = ev.detail.content;
 			if (content) {
 				if (content.url == null && content.fetch) {
@@ -32,8 +32,9 @@ AFRAME.registerComponent('vrm-select', {
 				el.setAttribute('vrm', { src: content.url });
 			}
 			// Install .bvh handler
-			if (ev.detail.appManager && !ev.detail.appManager.contentHandlers.includes(bvhContentHandler)) {
-				ev.detail.appManager.contentHandlers.push(bvhContentHandler);
+			let appManager = ev.detail.services.appManager;
+			if (appManager && !appManager.contentHandlers.includes(bvhContentHandler)) {
+				appManager.contentHandlers.push(bvhContentHandler);
 			}
 		}, { once: true });
 
