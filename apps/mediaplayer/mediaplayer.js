@@ -422,11 +422,11 @@ AFRAME.registerComponent('media-selector', {
 			}
 			console.log(item);
 			if (item.type === "list" || item.type === "tag") {
-				this._openList(item.path);
+				this._openList(item.path || this.data.path + '/' + item.name);
 			} else if (this.appManager && this.appManager.openContent(item)) {
 				// opened
 			} else if (item.type == "folder" || item.type == "archive") {
-				this._openList(item.path, item.type == "archive");
+				this._openList(item.path || this.data.path + '/' + item.name, item.type == "archive");
 			} else {
 				var cursor = new FileListCursor(this.itemlist, pos, (item) => {
 					let t = item.type.split("/")[0];
@@ -437,7 +437,7 @@ AFRAME.registerComponent('media-selector', {
 				if (!mp.playContent(item, cursor)) {
 					(await this.appManager.start('app-media-player')).addEventListener('loaded', e => {
 						mp.playContent(item, cursor);
-					}, { once: true });		
+					}, { once: true });
 				}
 			}
 		});
@@ -625,7 +625,7 @@ AFRAME.registerComponent('media-player', {
 			this.el.setAttribute("xywindow", "title", f.name);
 		}
 		if (this.el.components.vrapp && f.url) {
-			this.el.components.vrapp.args = {file: f};
+			this.el.components.vrapp.args = { file: f };
 		}
 
 		clearTimeout(this.loadingTimer);
