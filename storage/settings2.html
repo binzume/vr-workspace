@@ -1,0 +1,140 @@
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+	<meta name="theme-color" content="#0099ff" />
+	<link rel="stylesheet" type="text/css" href="css/choice.css" />
+	<link rel="stylesheet" type="text/css" href="css/form.css" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" />
+	<title>Storage Manager</title>
+	<script src="settings2.js" type="module"></script>
+</head>
+
+<body>
+	<header>
+		<ul class="menubar">
+			<li id="menu-button" class="clickable">≡</li>
+			<li><a href="./">Storage Manager</a></li>
+			<li><form name="search"><input type="text" id="search_keyword" class="attach_right"
+				autocomplete="off" required /><button id="search_button" class="material-icons">search</button></form></li>
+			<li style="float:right"><button id="option-menu-button" class="rounded-button">...</button></li>
+		</ul>
+		<ul id='search_list' class='popup' style='left:40px'></ul>
+		<ul id="option-menu" class='popup' style="right:4pt">
+			<li><a href="https://github.com/binzume/vr-workspace/" target="_blank">GitHub</a></li>
+		</ul>
+	</header>
+
+	<div id="content">
+
+	<div id="menu-pane">
+
+		<h2>Local(WebkitFileSystem)</h2>
+  
+		<ul class='simple'>
+		  <li>Status: <span id='webkit-filesystem-status'>?</span></li>
+		  <li>RequstQuota:
+			<select id='webkit-filesystem-size'>
+			  <option value='10'>10MB</option>
+			  <option value='100'>100MB</option>
+			  <option value='500'>500MB</option>
+			</select>
+			<button id='webkit-filesystem-request'>Request</button>
+		  </li>
+		  <li><a href="#list:WebkitFileSystem">Browse</a></li>
+		</ul>
+
+		<h2>Google Drive</h2>
+
+		<ul class='simple'>
+		  <li>Status: <span id='google-drive-status'>?</span></li>
+		  <li style="visibility:hidden">
+			<button id='google-drive-login'>Lgoin</button>
+		  </li>
+		  <li><a href="#list:GoogleDrive">Browse</a></li>
+		</ul>
+  
+	</div>
+
+	<div id="main-pane">
+		<div id="main-pane-header">
+			<button id="menu-hide-toggle" class="rounded-button"></button>
+			<h2 id="item-list-title">Files</h2>
+			<button id="item-list-mode-button" class="rounded-button material-icons">view_list</button>
+			<button id="item-sort-order-button" class="rounded-button">&#x2193;</button>
+			<button id="item-sort-button" class="rounded-button"><span class="material-icons">sort</span><span id="item-sort-label"></span></button>
+		</div>
+		<ul id="sort-order-list" class='popup' style="right:8pt">
+			<li><button data-sort-order="updatedTime">Last modified</button></li>
+			<li><button data-sort-order="name">Name</button></li>
+			<li><button data-sort-order="size">Size</button></li>
+			<li><button data-sort-order="type">Type</button></li>
+		</ul>
+
+        <button id='file-add-button' class='file-menu-write'>Add File</button>
+        <button id='file-mkdir-button' class='file-menu-write'>Mkdir</button>
+
+		<ul class="grid" id="item-list">
+		</ul>
+
+		<div class="loading-spinner"></div>
+		<div id="file-info">
+			<div><span class="name"></span><button class="material-icons close-button rounded-button">close</button></div>
+			<div class="content"></div>
+		</div>
+		<div id="error"></div>
+	</div>
+
+	</div>
+
+	<div id="embed_player" class="media-player" style="display:none;">
+		<div class="media-player-content fitscreen" tabindex="0"></div>
+		<button class="material-icons transparent_button player-prev" style="left:0px;">skip_previous</button>
+		<button class="material-icons transparent_button player-next" style="right:0px;">skip_next</button>
+		<div id="player-content-info">
+			<button class="material-icons close-button" style="display:none">close</button>
+			<h2 class="name"></h2>
+			<div class="content"></div>
+		</div>
+		<div class="transparent_button media-player-navigation">
+			<button class="material-icons player-fullscreen-button" title="Fullscreen"></button>
+			<button class="material-symbols-rounded player-spread-button" title="Spreaded">view_column_2</button>
+			<button class="material-icons player-small-button" title="Small player"></button>
+			<button class="material-symbols-rounded player-content-info-button" title="Info">info</button>
+			<button class="material-icons player-close-button">close</button>
+		</div>
+		<div class="loading_message">Loading....</div>
+		<div class="media-player-help">
+			<ul>
+				<li>Space : Play/Pause</li>
+				<li>Enter : Fullscreen</li>
+				<li>Left : back 10 seconds (video/audio)</li>
+				<li>Right : fwd 10 seconds (video/audio)</li>
+				<li>Shift+Left : Previous item</li>
+				<li>Shift+Right : Next item</li>
+				<li>Shift+Up : Speed up</li>
+				<li>Shift+Down : Speed down</li>
+				<li>Shift+R : Rotate 90</li>
+				<li>T : spread view (Images)</li>
+				<li>ESC : Close player</li>
+				<li>? : Help</li>
+			</ul>
+		</div>
+		<div class="transparent_button media-player-controller">
+			<input type="range" id="player-video-seek" min="0" max="1800" step="0.1" value="0" style="width:calc(100% - 20pt)" />
+			<div style="text-align: center;">
+				<button class="material-icons player-b10">replay_10</button>
+				<span id="player-video-position"></span>
+				<button class="material-icons player-f10">forward_10</button>
+				<label class="toggle material-icons"><input type="checkbox" class="player-mute"><span class="true">volume_off</span><span
+					 class="false">volume_up</span></label>
+				<label class="onoff material-icons"><input type="checkbox" class="player-loop"><span>repeat</span></label>
+				<input type="range" id="player-playbackRate" min="0.6" max="3.2" step="0.2" value="1" style="width:80pt" />
+				<span id="player-playbackRate-label"></span>
+			</div>
+		</div>
+	</div>
+
+</body>
+</html>

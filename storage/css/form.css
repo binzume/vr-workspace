@@ -1,0 +1,192 @@
+input[type="text"],input[type="password"] {
+	margin: 2pt;
+	padding: 0px 2pt;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+	height: 1.8em;
+}
+
+input[type="range"] {
+	-moz-appearance: none;
+	-webkit-appearance: none;
+	appearance: none;
+	margin: 2pt 6pt;
+	padding: 0px;
+	height: 10pt;
+	border: none;
+	outline: none;
+	background-color: transparent;
+}
+input[type=range]::-webkit-slider-runnable-track {
+	width: 100%;
+	height: 2pt;
+	border: none;
+	cursor: pointer;
+	background: #fff;
+}
+input[type=range]::-moz-range-track {
+	width: 100%;
+	height: 2pt;
+	border: none;
+	cursor: pointer;
+	background: #fff;
+}
+input[type=range]::-ms-track {
+	width: 100%;
+	height: 2pt;
+	border: none;
+	cursor: pointer;
+	background: #fff;
+}
+input[type="range"]::-webkit-slider-thumb {
+	-moz-appearance: none;
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	border: none;
+	border-radius: 50%;
+	width: 12px;
+	height: 12px;
+	margin-top: -3.5pt;
+	background-color: #fff;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+	background-color: #8af;
+}
+input[type="range"]::-moz-range-thumb {
+	-moz-appearance: none;
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	border: none;
+	border-radius: 50%;
+	width: 12px;
+	height: 12px;
+	margin-top: -3.5pt;
+	background-color: #fff;
+}
+input[type="range"]::-moz-range-thumb:hover {
+	background-color: #8af;
+}
+input[type="range"]::-ms-thumb {
+	-moz-appearance: none;
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	border: none;
+	border-radius: 50%;
+	width: 12px;
+	height: 12px;
+	margin-top: 0pt;
+	background-color: #fff;
+}
+input[type="range"]::-ms-thumb:hover {
+	background-color: #8af;
+}
+
+select {
+	margin: 2pt;
+	padding: 0px 2pt;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+	height: 1.8em;
+}
+
+label {
+	user-select: none;
+	-webkit-user-select: none;
+}
+textarea {
+	width: 400pt;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+	min-height: 5em;
+	resize: vertical;
+}
+button {
+	margin: 2pt;
+	padding: 1pt;
+	border-radius: 3px;
+	border: 1px solid #bbb;
+	user-select: none;
+}
+.attach_left {
+	margin-left: -1px;
+	border-top-left-radius: 0px;
+	border-bottom-left-radius: 0px;
+}
+.attach_right {
+	margin-right: 0px !important;;
+	border-top-right-radius: 0px !important;;
+	border-bottom-right-radius: 0px !important;;
+}
+.attach_right + * {
+	margin-left: -1px !important;
+	border-top-left-radius: 0px !important;
+	border-bottom-left-radius: 0px !important;
+}
+
+
+button:active {
+	background: -webkit-linear-gradient(top, #bbb, #ddd 40%, #eee);
+	background: linear-gradient(to bottom, #bbb, #ddd 40%, #eee);
+}
+
+button.submit {
+	border: #8ad;
+	background-color: #5af;
+	background: -webkit-linear-gradient(top, #7cf, #5af 10%, #68c);
+	background: linear-gradient(to bottom, #7cf, #5af 10%, #68c);
+}
+button.submit:active {
+	background: -webkit-linear-gradient(top, #68c, #5af 40%, #7cf);
+	background: linear-gradient(to bottom, #68c, #5af 40%, #7cf);
+}
+
+button.careful {
+	color: white;
+	border: #da8;
+	background-color: #d44;
+	background: -webkit-linear-gradient(top, #f88, #d44 10%, #922);
+	background: linear-gradient(to bottom, #f88, #d44 10%, #922);
+}
+button.careful:active {
+	background: -webkit-linear-gradient(top, #922, #d44 40%, #f88);
+	background: linear-gradient(to bottom, #922, #d44 40%, #f88);
+}
+
+fieldset.group {
+	border: 2px solid #bbb;
+	border-radius: 5px;
+}
+
+fieldset.group legend {
+	margin-left: 10pt;
+}
+
+.toast {
+	color: red;
+	width: 100%;
+	text-align:center;
+}
+
+/* table */
+th {
+	background-color: #dddddd;
+	min-width: 40pt;
+	width: 60pt;
+}
+th.node_name {
+	min-width: 140pt;
+}
+td {
+	background-color: #ccddff;
+	padding: 3pt 2pt;
+}
+td.node_name {
+	font-weight: bold;
+	padding: 3pt 1pt;
+}
+td.number {
+	text-align: right;
+}
