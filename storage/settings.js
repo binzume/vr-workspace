@@ -1,6 +1,7 @@
 
 import { WebkitFileSystemWrapper, install as installWebkitFs } from './webkit-filesystem.js';
 import { GoogleApiLoader, install as installGoogleDrive } from './google-drive.js';
+import './filelist.js';
 
 const storageType = window.PERSISTENT; // PERSISTENT or TEMPORARY;
 const authScope = 'https://www.googleapis.com/auth/drive';
@@ -11,37 +12,12 @@ let storageWrapper = new WebkitFileSystemWrapper(storageType);
 let currentStorage = 'WebkitFileSystem';
 let currentFolder = null;
 
-function makeEl(tag, children, attrs) {
-    let el = document.createElement(tag);
-    children && el.append(...[children].flat(999));
-    attrs instanceof Function ? attrs(el) : (attrs && Object.assign(el, attrs));
-    return el;
-}
-
-function formatDate(s) {
-    let t = new Date(s);
-    if (t.getTime() <= 0) {
-        return "";
-    }
-    let d2 = n => ("0" + n).substr(-2);
-    return [t.getFullYear(), d2(t.getMonth() + 1), d2(t.getDate())].join("-") + " " +
-        [d2(t.getHours()), d2(t.getMinutes()), d2(t.getSeconds())].join(":");
-}
-
 function formatSize(size) {
-    if (size == null) {
-        return "";
-    }
-    if (size > 1024 * 1024 * 1024 * 10) {
-        return (size / (1024 * 1024 * 1024) | 0) + "GiB";
-    }
-    if (size > 1024 * 1024 * 10) {
-        return (size / (1024 * 1024) | 0) + "MiB";
-    }
-    if (size > 1024 * 10) {
-        return (size / (1024) | 0) + "KiB";
-    }
-    return size + "B"
+    if (size == null) { return ''; }
+    if (size > 1024 * 1024 * 1024 * 10) { return (size / (1024 * 1024 * 1024) | 0) + 'GiB'; }
+    if (size > 1024 * 1024 * 10) { return (size / (1024 * 1024) | 0) + 'MiB'; }
+    if (size > 1024 * 10) { return (size / (1024) | 0) + 'KiB'; }
+    return size + 'B'
 }
 
 async function chedckGoogleDriveStatus() {
@@ -65,8 +41,21 @@ async function chedckGoogleDriveStatus() {
 
     statusEl.innerText = "Ok";
     if (currentStorage == 'GoogleDrive') {
-        await updateFileList();
+        await refreshFileList();
     }
+}
+
+function refreshFileList() {
+    if (globalThis.fileListView) {
+        globalThis.fileListView.selectList(globalThis.fileListView.path || 'WebkitFileSystem');
+    }
+}
+
+function getCurrentFolder() {
+    if (globalThis.fileListView && globalThis.fileListView.listCursor && globalThis.fileListView.listCursor._folder) {
+        return globalThis.fileListView.listCursor._folder;
+    }
+    return null;
 }
 
 async function chedckWebkitFileSystemStatus() {
@@ -89,57 +78,36 @@ async function chedckWebkitFileSystemStatus() {
     statusEl.innerText = `Ok (Usage: ${formatSize(quota.usedBytes)} / ${formatSize(quota.grantedBytes)}B)`;
 
     if (currentStorage == 'WebkitFileSystem') {
-        await updateFileList();
+        await refreshFileList();
     }
 }
 
-async function updateFileList(storage, path) {
-    currentStorage = storage || currentStorage;
-
-    let filesEl = document.querySelector('#item-list');
-    filesEl.innerHTML = '';
-    document.querySelector('#file-menu').classList.remove('writable');
-
-    document.querySelector('#item-list-title').innerText = currentStorage;
-
-    if (!globalThis.storageAccessors) {
-        return;
-    }
-    let accessor = globalThis.storageAccessors[currentStorage];
-    if (!accessor) {
-        return;
-    }
-    path = path || accessor.root || '';
-
-    let list = accessor.getFolder(path);
-    currentFolder = list;
-    await list.getInfo?.();
-
-    if (list.writeFile) {
-        document.querySelector('#file-menu').classList.add('writable');
-    }
-
-    let res = await list.getFiles(null, 1000, {});
-    for (let item of res.items) {
-        let li = makeEl('li', [formatDate(item.updatedTime), ' ', item.url ? makeEl('a', item.name, { href: item.url }) : item.name, ' ', formatSize(item.size)]);
-
-        if (item.remove) {
-            let deleteButton = makeEl('button', 'Remove');
-            li.append(deleteButton);
-            deleteButton.addEventListener('click', async (ev) => {
-                ev.preventDefault();
-                if (confirm(`Remove ${item.name} ?`)) {
-                    await item.remove();
-                    filesEl.removeChild(li);
-                    console.log("Removed " + item.name);
-                }
-            });
+globalThis.storageAccessors = globalThis.storageAccessors || {};
+globalThis.folderResolver = {
+    accessors: globalThis.storageAccessors,
+    getFolder(path, prefix = '') {
+        if (!path) {
+            return this;
         }
-
-        filesEl.append(li);
-    }
-}
-
+        let [storage, spath] = this._splitPath(path);
+        return this.accessors[storage]?.getFolder(spath, prefix + storage + '/');
+    },
+    parsePath(path) {
+        if (!path) {
+            return [['', 'Storages']];
+        }
+        let [storage, spath] = this._splitPath(path);
+        let acc = this.accessors[storage];
+        return [[storage, acc?.name]].concat(acc?.parsePath(spath) || []);
+    },
+    getFiles() {
+        return [];
+    },
+    _splitPath(path) {
+        let storage = path.split('/', 1)[0];
+        return [storage, path.substring(storage.length + 1)];
+    },
+};
 
 window.addEventListener('DOMContentLoaded', async (ev) => {
 
@@ -160,28 +128,39 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
         chedckWebkitFileSystemStatus();
     });
 
-    document.querySelector('#file-add-button').addEventListener('click', async (ev) => {
+    document.querySelector('#file-add-button').addEventListener('click', (ev) => {
         ev.preventDefault();
-        let inputEl = makeEl('input', null, {
-            type: `file`, multiple: true, style: "display:none"
-        });
-        inputEl.addEventListener('change', async (ev) => {
-            if (!currentFolder) {
-                return;
+        let folder = getCurrentFolder();
+        if (!folder || !folder.writeFile) {
+            return;
+        }
+        let inputEl = Object.assign(document.createElement('input'), {
+            type: `file`, multiple: true, style: "display:none", async onchange() {
+                let tasks = [];
+                for (let file of inputEl.files) {
+                    tasks.push(folder.writeFile(file.name, file));
+                }
+                document.body.removeChild(inputEl);
+                await Promise.all(tasks);
+                refreshFileList(); // TODO: update quata dispaly    
             }
-
-            let tasks = [];
-            for (let file of inputEl.files) {
-                tasks.push(currentFolder.writeFile(file.name, file));
-            }
-            document.body.removeChild(inputEl);
-            updateFileList();
-            await Promise.all(tasks);
-            updateFileList(); // TODO: update quata dispaly
         });
         document.body.appendChild(inputEl).click();
     });
 
+    document.querySelector('#file-mkdir-button').addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        let folder = getCurrentFolder();
+        if (!folder || !folder.mkdir) {
+            return;
+        }
+        let dir = prompt('mkdir');
+        if (!dir) {
+            return;
+        }
+        await folder.mkdir(dir);
+        refreshFileList();
+    });
 
     let onHashChanged = () => {
         if (!location.hash) {
@@ -190,9 +169,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
         let fragment = location.hash.slice(1);
         let m = fragment.match(/list:(\w+)\/?(.*)/)
         if (m) {
-            if (currentStorage != m[1]) {
-                updateFileList(m[1], m[2]);
-            }
+            currentStorage = m[1];
         }
     };
     onHashChanged();
@@ -200,5 +177,6 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
         ev.preventDefault();
         onHashChanged();
     }), false);
+    refreshFileList();
 
 }, { once: true });
