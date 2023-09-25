@@ -238,6 +238,7 @@ class FileListCursor {
 		this.items = [];
 		this._pos = -1;
 		this.finished = false;
+		this._next = null;
 		this._offset = 0;
 		this._ac = null;
 	}
@@ -247,13 +248,14 @@ class FileListCursor {
 		}
 		this._ac = new AbortController();
 		let signal = this._ac.signal;
-		let r = await this._folder.getFiles(this._offset, undefined, this.options, signal);
+		let r = await this._folder.getFiles(this._next || this._offset, undefined, this.options, signal);
 		signal.throwIfAborted();
 		this.finished = !r || r.next == null && !r.more;
 		this._ac = null;
 		if (r && r.items) {
 			this.items = this.items.concat(r.items);
 			this._offset += r.items.length;
+			this._next = r.next;
 		}
 		this.loaded && this.loaded(r);
 	}
