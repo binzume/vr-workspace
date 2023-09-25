@@ -122,10 +122,12 @@ class ArrayFileList extends BaseFileList {
         let r = order === "a" ? 1 : -1;
         if (orderBy === "name") {
             this.items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
-        } else if (orderBy === "updated") {
+        } else if (orderBy === "updatedTime") {
             this.items.sort((a, b) => (a.updatedTime || "").localeCompare(b.updatedTime) * r);
         } else if (orderBy === "size") {
             this.items.sort((a, b) => ((a.size && b.size) ? a.size - b.size : 0) * r);
+        } else if (orderBy === "type") {
+            this.items.sort((a, b) => (a.type || "").localeCompare(b.type) * r);
         }
     }
 }

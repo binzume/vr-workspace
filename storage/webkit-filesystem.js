@@ -50,6 +50,7 @@ export class WebkitFileSystemWrapper {
     async mkdir(path) {
         let n = '';
         for (let p of path.split('/')) {
+            if (!p) continue;
             n = n ? n + '/' + p : p;
             await new Promise((resolve, reject) => this.filesystem.root.getDirectory(n, { create: true }, resolve, reject));
         }
@@ -97,6 +98,7 @@ class WebkitFileSystemWrapperFileList {
             name: entry.name,
             type: entry.isFile ? file.type : 'folder',
             size: file?.size,
+            path: this._pathPrefix  + this._path + '/' + entry.name,
             url: file && URL.createObjectURL(file),
             updatedTime: file ? new Date(file.lastModified).toISOString() : null,
             remove() { return new Promise((resolve, reject) => this._entry.remove(resolve, reject)); },
@@ -128,10 +130,31 @@ class WebkitFileSystemWrapperFileList {
         if (this.size < 0) {
             await this.init();
         }
+        if (options && options.sortField) {
+            this._sort(this.items, options.sortField, options.sortOrder);
+        }
         return {
             items: this.items,
             total: this.items.length
         };
+    }
+
+    _sort(items, field, order) {
+        let r = order === "a" ? 1 : -1;
+        if (field === "name") {
+            items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
+        } else if (field === "updatedTime") {
+            items.sort((a, b) => (a.updatedTime || "").localeCompare(b.updatedTime) * r);
+        } else if (field === "size") {
+            items.sort((a, b) => ((a.size && b.size) ? a.size - b.size : 0) * r);
+        } else if (field === "type") {
+            items.sort((a, b) => (a.type || "").localeCompare(b.type) * r);
+        }
+    }
+
+    mkdir(name) {
+        console.log(this._path + '/' + name);
+        return this._storage.mkdir(this._path + '/' + name);
     }
 
     writeFile(name, blob, options = {}) {
