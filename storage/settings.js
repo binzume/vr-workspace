@@ -1,7 +1,7 @@
 
 import { WebkitFileSystemWrapper, install as installWebkitFs } from './webkit-filesystem.js';
 import { GoogleApiLoader, install as installGoogleDrive } from './google-drive.js';
-import './filelist.js';
+import './files.js';
 
 const storageType = window.PERSISTENT; // PERSISTENT or TEMPORARY;
 const authScope = 'https://www.googleapis.com/auth/drive';
