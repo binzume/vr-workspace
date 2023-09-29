@@ -1,9 +1,203 @@
 // https://developer.chrome.com/docs/apps/offline_storage/
 
+class FileSystemWrapper {
+    /**
+     * 
+     * @param {FileSystemDirectoryHandle} handle 
+     * @param {StorageManager} storageManager 
+     */
+    constructor(handle, storageManager) {
+        this.storageManager = storageManager;
+        this.writable = false;
+        this.handle = handle;
+    }
+
+    available() {
+        return this.handle != null;
+    }
+
+    async quota() {
+        let a = await this.storageManager.estimate();
+        return {usedBytes: a.usage, grantedBytes: a.quota};
+    }
+
+    async setWritable(writable) {
+        this.writable = writable;
+        if (writable) {
+            return await this.handle.requestPermission({ mode: 'readwrite' }) === 'granted';
+        }
+    }
+    async stat(path) {
+        return await this.statInternal(await this.resolvePath(path));
+    }
+    async files(path, offset = 0, limit = -1) {
+        let h = await this.resolvePath(path, 'directory');
+        if (limit == 0) { return []; }
+        let fileTasks = [];
+        let pos = 0;
+        for await (let ent of h.values()) {
+            if (pos++ < offset) { continue; }
+            fileTasks.push(this.statInternal(ent));
+            if (limit > 0 && fileTasks.length >= limit) { break; }
+        }
+        return Promise.all(fileTasks);
+    }
+    async read(path, offset = 0, len) {
+        if (path.endsWith('#thumbnail.jpeg')) {
+            let file = await this.resolveFile(path.substring(0, path.lastIndexOf('#')));
+            let blob = await this.createThumbnail(file);
+            return blob.slice(offset, offset + len);
+        }
+        let file = await this.resolveFile(path);
+        return file.slice(offset, offset + len);
+    }
+    async write(path, offset = 0, data) {
+        if (!this.writable) { throw 'readonly'; }
+        let handle = await this.resolvePath(path, 'file');
+        let writer = await handle.createWritable({ keepExistingData: true });
+        await writer.seek(offset);
+        await writer.write(data);
+        await writer.close();
+        return data.length;
+    }
+    async remove(path) {
+        if (!this.writable) { throw 'readonly'; }
+        // TODO
+        return false;
+    }
+
+    async mkdir(path) {
+        if (!this.writable) { throw 'readonly'; }
+        let p = path.split('/').filter(p => p);
+        let h = this.handle;
+        for (let i = 0; i < p.length; i++) {
+            h = await h.getDirectoryHandle(p[i], {create: true});
+        }
+        return h;
+    }
+
+    /**
+     * @param {string} path 
+     * @param {Blob} content 
+     * @param {*} options 
+     */
+    async writeFile(path, content, options = {}) {
+        if (!this.writable) { throw 'readonly'; }
+        if (options.mkdir) {
+            let p = path.lastIndexOf('/');
+            if (p > 0) {
+                await this.mkdir(path.substring(0, p));
+            }
+
+        }
+        let handle = await this.resolvePath(path, 'file', true);
+        let writer = await handle.createWritable({ keepExistingData: options.keepExistingData });
+        await writer.write(content);
+        await writer.close();
+    }
+ 
+    /**
+     * @param {string} path
+     * @return {Promise<FileSystemFileHandle>}
+     */
+    async resolvePath(path, kind = null, create = false) {
+        let p = path.split('/');
+        let h = this.handle;
+        let wrap = async (/** @type {Promise<FileSystemFileHandle>} */ t) => { try { return await t; } catch { } };
+        for (let i = 0; i < p.length; i++) {
+            if (p[i] == '' || p[i] == '.') { continue; }
+            let c = await ((i == p.length - 1 && kind == 'file') ? wrap(h.getFileHandle(p[i], {create})) : wrap(h.getDirectoryHandle(p[i])));
+            if (!c && kind == null) { c = await wrap(h.getFileHandle(p[i])); }
+            if (!c) throw 'noent';
+            h = c;
+        }
+        return h;
+    }
+    /**
+     * @param {string} path
+     * @return {Promise<File>}
+     */
+    async resolveFile(path) {
+        return await (await this.resolvePath(path, 'file')).getFile();
+    }
+
+    /**
+     * @param {FileSystemHandle2} handle 
+     */
+    async statInternal(handle) {
+        if (handle.kind == 'file') {
+            let f = await handle.getFile();
+            let stat = { type: f.type || 'file', name: f.name, size: f.size, updatedTime: f.lastModified, _file: f }
+            if (["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"].includes(f.type)) {
+                stat.metadata = { thumbnail: "#thumbnail.jpeg" };
+            }
+            return stat;
+        } else {
+            return { type: 'folder', size: 0, name: handle.name, updatedTime: null }
+        }
+    }
+
+    /**
+     * @param {Blob} file 
+     * @returns {Promise<Blob>}
+     */
+    async createThumbnail(file, maxWidth = 200, maxHeight = 200) {
+        let canvas = document.createElement('canvas');
+        let drawThumbnail = (image, w, h) => {
+            if (w > maxWidth) {
+                h = h * maxWidth / w;
+                w = maxWidth;
+            }
+            if (h > maxHeight) {
+                w = w * maxHeight / h;
+                h = maxHeight;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(image, 0, 0, w, h);
+        };
+        let objectUrl = URL.createObjectURL(file);
+        let media;
+        try {
+            if (file.type.startsWith('video')) {
+                // TODO: detect background tab
+                media = document.createElement('video');
+                media.muted = true;
+                media.autoplay = true;
+                await new Promise((resolve, reject) => {
+                    media.onloadeddata = resolve;
+                    media.onerror = reject;
+                    media.src = objectUrl;
+                    setTimeout(reject, 3000);
+                });
+                await new Promise((resolve, _reject) => {
+                    media.onseeked = resolve;
+                    media.currentTime = 3;
+                    setTimeout(resolve, 500);
+                });
+                drawThumbnail(media, media.videoWidth, media.videoHeight);
+            } else {
+                media = new Image();
+                await new Promise((resolve, reject) => {
+                    media.onload = resolve;
+                    media.onerror = reject;
+                    media.src = objectUrl;
+                    setTimeout(reject, 5000);
+                });
+                drawThumbnail(media, media.naturalWidth, media.naturalHeight);
+            }
+        } finally {
+            if (media) { media.src = ''; }
+            URL.revokeObjectURL(objectUrl);
+        }
+        return await new Promise((resolve, _) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+    }
+}
+
 export class WebkitFileSystemWrapper {
-    constructor(type) {
-        this._type = type;
-        this._storage = type == window.PERSISTENT ? navigator.webkitPersistentStorage : navigator.webkitTemporaryStorage;
+    constructor(persistent) {
+        this._type = persistent ? window.PERSISTENT : window.TEMPORARY;
+        this._storage = persistent ? navigator.webkitPersistentStorage : navigator.webkitTemporaryStorage;
         // window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
         // window.directoryEntry = window.directoryEntry || window.webkitDirectoryEntry;
     }
@@ -47,6 +241,12 @@ export class WebkitFileSystemWrapper {
         } while (files.length > 0);
         return ret;
     }
+
+    async files(path) {
+        let entries = await this.entries(path);
+        return await Promise.all(entries.map((entry) => this.statInternal(entry)));
+    }
+
     async mkdir(path) {
         let n = '';
         for (let p of path.split('/')) {
@@ -76,6 +276,26 @@ export class WebkitFileSystemWrapper {
         await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.truncate(0); });
         await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.write(content); });
     }
+    async statInternal(entry) {
+        let file = entry.isFile ? (await new Promise((resolve, reject) => entry.file(resolve, reject))) : null;
+        let storage = this;
+        return {
+            name: entry.name,
+            type: entry.isFile ? file.type : 'folder',
+            size: file?.size,
+            updatedTime: file ? file.lastModified : null,
+            remove() { return new Promise((resolve, reject) => entry.remove(resolve, reject)); },
+            async fetch(start, end) {
+                return start != null ? file.slice(start, end) : file;
+            },
+            async update(blob) {
+                await storage.writeFile(entry.fullPath, blob);
+                this.size = blob.size;
+                return this;
+            },
+            _file: file,
+        };
+    }
 }
 
 class WebkitFileSystemWrapperFileList {
@@ -88,31 +308,12 @@ class WebkitFileSystemWrapperFileList {
     }
 
     async init() {
-        let entries = await this._storage.entries(this._path);
-        let getFile = (ent) => ent.isFile ? new Promise((resolve, reject) => ent.file(resolve, reject)) : Promise.resolve(null);
-        let files = await Promise.all(entries.map(async (entry) => {
-            return [entry, await getFile(entry)];
-        }));
-        let storage = this._storage;
-        this.items = files.map(([entry, file]) => ({
-            name: entry.name,
-            type: entry.isFile ? file.type : 'folder',
-            size: file?.size,
-            path: this._pathPrefix  + this._path + '/' + entry.name,
-            url: file && URL.createObjectURL(file),
-            updatedTime: file ? new Date(file.lastModified).toISOString() : null,
-            remove() { return new Promise((resolve, reject) => this._entry.remove(resolve, reject)); },
-            async fetch(start, end) {
-                let file = await getFile(this._entry);
-                return start != null ? file.slice(start, end) : file;
-            },
-            async update(blob) {
-                await storage.writeFile(this._entry.fullPath, blob);
-                this.size = blob.size;
-                return this;
-            },
-            _entry: entry,
-        }));
+        let files = await this._storage.files(this._path);
+        this.items = files.map(f => {
+            f.path = this._pathPrefix  + this._path + '/' + f.name;
+            f.url = f._file && URL.createObjectURL(f._file);
+            return f;
+        });
         this.size = this.items.length;
     }
 
@@ -134,7 +335,7 @@ class WebkitFileSystemWrapperFileList {
             this._sort(this.items, options.sortField, options.sortOrder);
         }
         return {
-            items: this.items,
+            items: this.items.slice(offset),
             total: this.items.length
         };
     }
@@ -144,7 +345,7 @@ class WebkitFileSystemWrapperFileList {
         if (field === "name") {
             items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
         } else if (field === "updatedTime") {
-            items.sort((a, b) => (a.updatedTime || "").localeCompare(b.updatedTime) * r);
+            items.sort((a, b) => ((a.updatedTime && b.updatedTime) ? a.updatedTime - b.updatedTime : 0) * r);
         } else if (field === "size") {
             items.sort((a, b) => ((a.size && b.size) ? a.size - b.size : 0) * r);
         } else if (field === "type") {
@@ -153,7 +354,6 @@ class WebkitFileSystemWrapperFileList {
     }
 
     mkdir(name) {
-        console.log(this._path + '/' + name);
         return this._storage.mkdir(this._path + '/' + name);
     }
 
@@ -170,9 +370,9 @@ class WebkitFileSystemWrapperFileList {
 }
 
 export async function install() {
-    let storageType = window.PERSISTENT;
-    let storageWrapper = new WebkitFileSystemWrapper(storageType);
-
+    let storageWrapper = new WebkitFileSystemWrapper(true);
+    //let storageWrapper = new FileSystemWrapper(await navigator.storage.getDirectory(), navigator.storage);
+ 
     if (!storageWrapper.available()) {
         console.log("webkitFileSystem is not supported.");
         return false;
