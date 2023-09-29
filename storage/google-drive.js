@@ -59,7 +59,7 @@ export class GoogleDrive {
             resource: { mimeType: mimeType }
         });
     }
-    async delete(fileId) {
+    async remove(fileId) {
         return (await gapi.client.drive.files.delete({
             fileId: fileId
         })).status == 204;
@@ -86,8 +86,15 @@ export class GoogleDrive {
 
         let response = await fetch(url, { method: 'PATCH', headers: new Headers(headers), body: blob });
         if (!response.ok) throw new Error(response.statusText);
-        console.log(response);
         return response;
+    }
+    async mkdir(name, parent = null) {
+        return await gapi.client.drive.files.create({
+            name: name,
+            parents: [parent || 'root'],
+            fields: "id, name, parents",
+            mimeType: 'application/vnd.google-apps.folder'
+        });
     }
     async getFileBlob(fileId) {
         let url = this.getFileMediaUrl(fileId);
@@ -97,6 +104,7 @@ export class GoogleDrive {
         return await response.blob();
     }
 }
+
 class GoogleDriveFileList {
     constructor(folderId, drive, pathPrefix) {
         this._folderId = folderId;
@@ -145,7 +153,7 @@ class GoogleDriveFileList {
             updatedTime: f.modifiedTime,
             fetch(start, end) { return drive.fetch(this.id, start, end); },
             update(blob) { return drive.update(this.id, blob); },
-            remove() { return drive.delete(this.id); },
+            remove() { return drive.remove(this.id); },
         }));
         return {
             items: files,
@@ -160,6 +168,9 @@ class GoogleDriveFileList {
         let f = await this.drive.create(name, '', blob.type, this._folderId);
         console.log(JSON.parse(f.body));
         return await this.drive.update(JSON.parse(f.body).id, blob);
+    }
+    async mkdir(name) {
+        await this.drive.mkdir(name, this._folderId);
     }
     getParentPath() {
         return this._parent && this._pathPrefix + this._parent;
