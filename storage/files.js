@@ -676,6 +676,17 @@ class FileListView {
 				elem.scrollTop = savedScrollTop;
 			}
 		}, false);
+		this.el.addEventListener('dragover', ev => {
+			if (this.listCursor._folder?.writeFile) {
+				ev.preventDefault();
+			}
+		});
+		this.el.addEventListener('drop', ev => {
+			ev.preventDefault();
+			for (let file of ev.dataTransfer.files) {
+				this.listCursor._folder.writeFile(file.name, file);
+			}
+		});
 	}
 
 	checkScroll() {
@@ -986,7 +997,7 @@ window.addEventListener('DOMContentLoaded', (function (e) {
 	});
 	searchInputEl.addEventListener('focusin', function (ev) {
 		searchTimeout = setTimeout(function () {
-			updateSearchResult(search(searchInputEl.value, [ mediaPlayerController.cursor.items || []]));
+			updateSearchResult(search(searchInputEl.value, [mediaPlayerController.cursor.items || []]));
 		}, 300);
 	});
 	searchInputEl.addEventListener('focusout', function (ev) {
