@@ -166,7 +166,6 @@ class GoogleDriveFileList {
      */
     async writeFile(name, blob) {
         let f = await this.drive.create(name, '', blob.type, this._folderId);
-        console.log(JSON.parse(f.body));
         return await this.drive.update(JSON.parse(f.body).id, blob);
     }
     async mkdir(name) {
