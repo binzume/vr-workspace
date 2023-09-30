@@ -30,7 +30,16 @@
 
 	<div id="menu-pane">
 
-		<h2>Local(WebkitFileSystem)</h2>
+		<h2>Local(Standard)</h2>
+  
+		<ul class='simple'>
+		  <li>Status: <span id='local-filesystem-status'>?</span></li>
+		  <li>Parsisted: <span id='local-filesystem-persisted'>?</span></li>
+		  <li>Enable: <input id='local-filesystem-enable' type="checkbox" class="toggle" checked /></li>
+		  <li><a href="#list:local">Browse</a></li>
+		</ul>
+
+		<h2>Local(Webkit)</h2>
   
 		<ul class='simple'>
 		  <li>Status: <span id='webkit-filesystem-status'>?</span></li>

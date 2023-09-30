@@ -105,6 +105,20 @@ function initGoogleDriveUI() {
     });
 }
 
+function initLocalFileSystemUI() {
+    let storageId = 'local';
+    let enableEl = document.querySelector('#local-filesystem-enable');
+    enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
+    enableEl.addEventListener('change', async (ev) => {
+        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+    });
+    (async () => {
+        let persisted = await navigator.storage.persisted();
+        document.querySelector('#local-filesystem-persisted').textContent = persisted ? 'Yes' : 'No';
+    })();
+}
+
+
 function initWebkitFileSystemUI() {
     let storageId = 'WebkitFileSystem';
     let enableEl = document.querySelector('#webkit-filesystem-enable');
@@ -137,6 +151,7 @@ function initDemoStorageUI() {
 }
 
 window.addEventListener('DOMContentLoaded', async (ev) => {
+    initLocalFileSystemUI();
     initGoogleDriveUI();
     initWebkitFileSystemUI();
     initDemoStorageUI();
