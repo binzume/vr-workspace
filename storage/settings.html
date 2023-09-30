@@ -7,6 +7,7 @@
 	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
 	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" />
 	<title>File Manager</title>
+	<script src="internal.js"></script>
 	<script src="settings.js" type="module"></script>
 </head>
 
@@ -41,19 +42,25 @@
 			</select>
 			<button id='webkit-filesystem-request'>Request</button>
 		  </li>
+		  <li>Enable: <input id='webkit-filesystem-enable' type="checkbox" class="toggle" checked /></li>
 		  <li><a href="#list:WebkitFileSystem">Browse</a></li>
 		</ul>
 
 		<h2>Google Drive</h2>
 
 		<ul class='simple'>
-		  <li>Status: <span id='google-drive-status'>?</span></li>
-		  <li style="visibility:hidden">
-			<button id='google-drive-login'>Lgoin</button>
-		  </li>
+		  <li>Status: <span id='google-drive-status'>?</span> <button id='google-drive-login'>Lgoin</button></li>
+		  <li>Enable: <input id='google-drive-enable' type="checkbox" class="toggle" checked /></li>
 		  <li><a href="#list:GoogleDrive">Browse</a></li>
 		</ul>
-  
+
+		<h2>Demo Storage</h2>
+
+		<ul class='simple'>
+		  <li>Enable: <input id='demo-storage-enable' type="checkbox" class="toggle" checked /></li>
+		  <li><a href="#list:DEMO/list.json">Browse</a></li>
+		</ul>
+
 	</div>
 
 	<div id="main-pane">

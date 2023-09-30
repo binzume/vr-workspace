@@ -32,7 +32,7 @@ async function chedckGoogleDriveStatus() {
 
     if (!await googleApiLoader.auth(authScope, false)) {
         statusEl.innerText = "Not logged-in";
-        document.querySelector('#google-drive-login').parentNode.style.visibility = 'visible';
+        document.querySelector('#google-drive-login').style.visibility = 'visible';
         return;
     }
 
@@ -82,44 +82,42 @@ async function chedckWebkitFileSystemStatus() {
     }
 }
 
-globalThis.storageAccessors = globalThis.storageAccessors || {};
-globalThis.folderResolver = {
-    accessors: globalThis.storageAccessors,
-    getFolder(path, prefix = '') {
-        if (!path) {
-            return this;
-        }
-        let [storage, spath] = this._splitPath(path);
-        return this.accessors[storage]?.getFolder(spath, prefix + storage + '/');
-    },
-    parsePath(path) {
-        if (!path) {
-            return [['', 'Storages']];
-        }
-        let [storage, spath] = this._splitPath(path);
-        let acc = this.accessors[storage];
-        return [[storage, acc?.name]].concat(acc?.parsePath(spath) || []);
-    },
-    getFiles() {
-        return [];
-    },
-    _splitPath(path) {
-        let storage = path.split('/', 1)[0];
-        return [storage, path.substring(storage.length + 1)];
-    },
-};
+globalThis.folderResolver = globalThis.storageList;
 
-window.addEventListener('DOMContentLoaded', async (ev) => {
-
-    chedckGoogleDriveStatus();
+function initGoogleDriveUI() {
+    document.querySelector('#google-drive-login').style.visibility = 'hidden';
+    let storageId = 'GoogleDrive';
+    let enableEl = document.querySelector('#google-drive-enable');
+    enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
+    enableEl.addEventListener('change', async (ev) => {
+        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        if (enableEl.checked) {
+            chedckGoogleDriveStatus();
+        }
+    });
+    if (enableEl.checked) {
+        chedckGoogleDriveStatus();
+    }
     document.querySelector('#google-drive-login').addEventListener('click', async (ev) => {
         ev.preventDefault();
         await googleApiLoader.auth(authScope, true);
         chedckGoogleDriveStatus();
     });
+}
 
-
-    chedckWebkitFileSystemStatus();
+function initWebkitFileSystemUI() {
+    let storageId = 'WebkitFileSystem';
+    let enableEl = document.querySelector('#webkit-filesystem-enable');
+    enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
+    enableEl.addEventListener('change', async (ev) => {
+        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        if (enableEl.checked) {
+            chedckWebkitFileSystemStatus();
+        }
+    });
+    if (enableEl.checked) {
+        chedckWebkitFileSystemStatus();
+    }
     document.querySelector('#webkit-filesystem-request').addEventListener('click', async (ev) => {
         ev.preventDefault();
 
@@ -127,6 +125,21 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
         console.log(await storageWrapper.requestQuota(sizeBytes));
         chedckWebkitFileSystemStatus();
     });
+}
+
+function initDemoStorageUI() {
+    let storageId = 'DEMO';
+    let enableEl = document.querySelector('#demo-storage-enable');
+    enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
+    enableEl.addEventListener('change', async (ev) => {
+        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+    });
+}
+
+window.addEventListener('DOMContentLoaded', async (ev) => {
+    initGoogleDriveUI();
+    initWebkitFileSystemUI();
+    initDemoStorageUI();
 
     document.querySelector('#file-add-button').addEventListener('click', (ev) => {
         ev.preventDefault();

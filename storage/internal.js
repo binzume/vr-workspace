@@ -172,7 +172,15 @@ class StorageList extends ArrayFileList {
     _update() {
         /** @type {object[]} */
         let items = [];
+        let settings = {};
+        try {
+            settings = JSON.parse(localStorage.getItem('storageSettings') || '{}');
+        } catch { }
+
         for (let [k, sa] of Object.entries(this.accessors)) {
+            if (settings[k] && settings[k].hidden) {
+                continue;
+            }
             if (sa.entrypoints && Object.keys(sa.entrypoints).length) {
                 Object.keys(sa.entrypoints).forEach(n => {
                     items.push({ name: n, type: 'folder', path: k + '/' + sa.entrypoints[n], updatedTime: '' });
@@ -183,6 +191,21 @@ class StorageList extends ArrayFileList {
             }
         }
         this.setItems(items);
+    }
+    setOptions(id, options) {
+        let settings = {};
+        try {
+            settings = JSON.parse(localStorage.getItem('storageSettings') || '{}');
+        } catch { }
+        settings[id] = options;
+        localStorage.setItem('storageSettings', JSON.stringify(settings));
+        this._update();
+    }
+    getOptions(id) {
+        try {
+            return JSON.parse(localStorage.getItem('storageSettings') || '{}')[id];
+        } catch { }
+        return null;
     }
     addStorage(id, data) {
         this.accessors[id] = data;
