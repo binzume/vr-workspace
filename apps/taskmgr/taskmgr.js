@@ -14,19 +14,42 @@ AFRAME.registerComponent('task-manager', {
 	remove() {
 		clearInterval(this._updateTimer);
 	},
+	_appFolder() {
+		let app = this.el.components.vrapp;
+		if (app && app.context) {
+			return app.context.getDataFolder();
+		}
+		return null;
+	},
+	async _saveJson(name, data) {
+		let json = JSON.stringify(data);
+		let folder = this._appFolder();
+		if (!folder || !folder.writeFile) {
+			localStorage.setItem('taskmgr-' + name,json);
+			return;
+		}
+		await folder.writeFile(name + '.json', new Blob([json], {type: 'application/json'}), {mkdir: true});
+	},
+	async _loadJson(name) {
+		let folder = this._appFolder();
+		if (!folder || !folder.writeFile) {
+			let json = localStorage.getItem('taskmgr-' + name);
+			return json ? JSON.parse(json) : null;
+		}
+		let file = await folder.getFile(name + '.json');
+		return await (await file.fetch()).json();
+	},
 	_initRunningAppList() {
 		this._elByName('kill-all-button').addEventListener('click', (ev) => {
 			this._appManager.killAll();
 		});
 		this._elByName('save-session-button').addEventListener('click', (ev) => {
-			let sessionJson = JSON.stringify(this._appManager.saveWorkspace());
-			localStorage.setItem('taskmgr-session01', sessionJson);
-			console.log(sessionJson);
+			this._saveJson('session01', this._appManager.saveWorkspace());
 		});
-		this._elByName('load-session-button').addEventListener('click', (ev) => {
-			let sessionJson = localStorage.getItem('taskmgr-session01');
-			if (sessionJson) {
-				this._appManager.restoreWorkspace(JSON.parse(sessionJson));
+		this._elByName('load-session-button').addEventListener('click', async (ev) => {
+			let session = await this._loadJson('session01');
+			if (session) {
+				this._appManager.restoreWorkspace(session);
 			}
 		});
 

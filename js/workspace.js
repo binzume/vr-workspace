@@ -84,8 +84,9 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
-		let services = {appManager: this, storageManager: globalThis.storageList};
-		let onstart = () => el.emit('app-start', { appManager: this, app: app, services: services, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
+		let services = { appManager: this, storageManager: globalThis.storageList };
+		let getDataFolder = () => globalThis.storageList.getFolder('local/' + app.id + '/data');
+		let onstart = () => el.emit('app-start', { appManager: this, app: app, services: services, getDataFolder: getDataFolder, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
 			onstart();
 		} else {
@@ -317,7 +318,7 @@ class AppManager {
 	 */
 	async restoreWorkspace(state, sceneEl = null) {
 		for (let s of state) {
-			let el = await this.start(s.id, sceneEl, {restoreState: s.state, appArgs: s.args, disableWindowLocator: true});
+			let el = await this.start(s.id, sceneEl, { restoreState: s.state, appArgs: s.args, disableWindowLocator: true });
 			if (el) {
 				el.setAttribute('position', s.p);
 				el.setAttribute('rotation', s.r);
@@ -341,10 +342,12 @@ AFRAME.registerComponent('vrapp', {
 	init() {
 		/** @type {AppManager} */
 		this.services = {};
+		this.context = null;
 		this.appManager = null;
 		this.app = null;
 		this.args = null;
 		this.el.addEventListener('app-start', (ev) => {
+			this.context = ev.detail;
 			this.services = ev.detail.services;
 			this.appManager = this.services.appManager;
 			this.app = ev.detail.app;
@@ -767,8 +770,8 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		// Deprecated
 		m = fragment.match(/list:(.+)/);
 		if (m) {
-			let path =  'MEDIA/' + decodeURI(m[1]);
-			let mediaList = await window.appManager.start('app-media-selector', null, {appArgs: path});
+			let path = 'MEDIA/' + decodeURI(m[1]);
+			let mediaList = await window.appManager.start('app-media-selector', null, { appArgs: path });
 			let play = fragment.match(/play:(\d+)/);
 			if (play) {
 				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);

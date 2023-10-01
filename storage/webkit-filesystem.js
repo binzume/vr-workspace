@@ -103,6 +103,11 @@ class FileSystemWrapper {
         await writer.close();
     }
 
+    async getFile(path) {
+        let handle = await this.resolvePath(path, 'file', false);
+        return await this.statInternal(handle);
+   }
+
     /**
      * @param {string} path
      * @return {Promise<FileSystemFileHandle>}
@@ -269,6 +274,15 @@ export class WebkitFileSystemWrapper {
             await new Promise((resolve, reject) => this.filesystem.root.getDirectory(n, { create: true }, resolve, reject));
         }
     }
+
+    async getFile(path) {
+        if (!this.filesystem) {
+            await this.requestFileSystem();
+        }
+        let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, {}, resolve, reject));
+        return await this.statInternal(file);
+    }
+
     /**
      * @param {string} path 
      * @param {Blob} content 
@@ -283,7 +297,6 @@ export class WebkitFileSystemWrapper {
             if (p > 0) {
                 await this.mkdir(path.substring(0, p));
             }
-
         }
         let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, { create: true }, resolve, reject));
         let writer = await new Promise((resolve, reject) => file.createWriter(resolve, reject));
@@ -299,9 +312,6 @@ export class WebkitFileSystemWrapper {
             size: file?.size,
             updatedTime: file ? file.lastModified : null,
             remove() { return new Promise((resolve, reject) => entry.remove(resolve, reject)); },
-            async fetch(start, end) {
-                return start != null ? file.slice(start, end) : file;
-            },
             async update(blob) {
                 await storage.writeFile(entry.fullPath, blob);
                 this.size = blob.size;
@@ -323,19 +333,25 @@ class WebkitFileSystemWrapperFileList {
 
     async init() {
         let files = await this._storage.files(this._path);
-        this.items = files.map(f => {
-            let path = (this._path ? this._path + '/' : '') + f.name;
-            f.path = this._pathPrefix + path;
-            f.url = f._file && URL.createObjectURL(f._file);
-            f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
-            if (f.metadata && f.metadata.thumbnail) {
-                f.thumbnail = {fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999))};
-            }
-            return f;
-        });
+        this.items = files.map(f => this._procFile(f));
         this.size = this.items.length;
     }
 
+    _procFile(f) {
+        let path = (this._path ? this._path + '/' : '') + f.name;
+        f.path = this._pathPrefix + path;
+        f.url = f._file && URL.createObjectURL(f._file);
+        f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
+        if (f.metadata && f.metadata.thumbnail) {
+            f.thumbnail = {fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999))};
+        }
+        if (f._file) {
+            f.fetch = async(start, end) => {
+                return new Response(start != null ? f._file.slice(start, end) : f._file);
+            };
+        }
+        return f;
+    }
     async getInfo() {
         if (this.size < 0) {
             await this.init();
@@ -378,6 +394,10 @@ class WebkitFileSystemWrapperFileList {
 
     writeFile(name, blob, options = {}) {
         return this._storage.writeFile(this._path + '/' + name, blob, options);
+    }
+
+    async getFile(name) {
+        return this._procFile(await this._storage.getFile(this._path + '/' + name));
     }
 
     getParentPath() {
