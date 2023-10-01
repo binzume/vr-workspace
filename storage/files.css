@@ -122,20 +122,20 @@ input[type=checkbox].toggle {
 	-webkit-tap-highlight-color: transparent;
 	-webkit-appearance: none;
 	-moz-appearance: none;
+	position: relative;
+	display: inline-block;
+	vertical-align: text-bottom;
+	padding: 0;
+	margin: 0;
+	height: 24px;
+	width: 52px;
+	border: 2px solid #aaaaaa;
+	border-radius: 999px;
+	background: #bbbbbb;
+	transition: all 0.1s ease;
 }
 input[type=checkbox].toggle:focus {
 	outline: 0;
-}
-input[type=checkbox].toggle {
-	display: inline-block;
-	position: relative;
-	margin: 0;
-	height: 27px;
-	width: 54px;
-	border-radius: 999px;
-	border: 2px solid #aaaaaa;
-	background: #666666;
-	transition: all 0.1s ease;
 }
 input[type=checkbox].toggle:after {
 	content: "";
@@ -149,7 +149,8 @@ input[type=checkbox].toggle:after {
 	transition: all 0.1s cubic-bezier(0.5, 0.1, 0.75, 1.35);
 }
 input[type=checkbox].toggle:checked {
-	border-color: #00ff00;
+	border-color: #00aa00;
+	background: white;
 }
 input[type=checkbox].toggle:checked:after {
 	transform: translatex(27px);
