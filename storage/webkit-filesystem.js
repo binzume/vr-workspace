@@ -7,7 +7,7 @@ class FileSystemWrapper {
      * @param {StorageManager} storageManager 
      */
     constructor(handle, storageManager) {
-        this.writable = false;
+        this.writable = storageManager != null;
         this._rootHandle = handle;
         this._storageManager = storageManager;
     }
@@ -18,7 +18,7 @@ class FileSystemWrapper {
 
     async quota() {
         let a = await this._storageManager.estimate();
-        return {usedBytes: a.usage, grantedBytes: a.quota};
+        return { usedBytes: a.usage, grantedBytes: a.quota };
     }
 
     async setWritable(writable) {
@@ -60,10 +60,17 @@ class FileSystemWrapper {
         await writer.close();
         return data.length;
     }
-    async remove(path) {
+    async remove(path, options) {
         if (!this.writable) { throw 'readonly'; }
-        // TODO
-        return false;
+        let dir = '', name = path;
+        let p = path.lastIndexOf('/');
+        if (p > 0) {
+            dir = path.substring(0, p);
+            name = path.substring(p + 1);
+        }
+        let hdir = /** @type {FileSystemDirectoryHandle} */(await this.resolvePath(dir));
+        await hdir.removeEntry(name, options);
+        return true;
     }
 
     async mkdir(path) {
@@ -71,7 +78,7 @@ class FileSystemWrapper {
         let p = path.split('/').filter(p => p);
         let h = await this._root();
         for (let i = 0; i < p.length; i++) {
-            h = await h.getDirectoryHandle(p[i], {create: true});
+            h = await h.getDirectoryHandle(p[i], { create: true });
         }
         return h;
     }
@@ -95,7 +102,7 @@ class FileSystemWrapper {
         await writer.write(content);
         await writer.close();
     }
- 
+
     /**
      * @param {string} path
      * @return {Promise<FileSystemFileHandle>}
@@ -106,7 +113,7 @@ class FileSystemWrapper {
         let wrap = async (/** @type {Promise<FileSystemFileHandle>} */ t) => { try { return await t; } catch { } };
         for (let i = 0; i < p.length; i++) {
             if (p[i] == '' || p[i] == '.') { continue; }
-            let c = await ((i == p.length - 1 && kind == 'file') ? wrap(h.getFileHandle(p[i], {create})) : wrap(h.getDirectoryHandle(p[i])));
+            let c = await ((i == p.length - 1 && kind == 'file') ? wrap(h.getFileHandle(p[i], { create })) : wrap(h.getDirectoryHandle(p[i])));
             if (!c && kind == null) { c = await wrap(h.getFileHandle(p[i])); }
             if (!c) throw 'noent';
             h = c;
@@ -317,14 +324,19 @@ class WebkitFileSystemWrapperFileList {
     async init() {
         let files = await this._storage.files(this._path);
         this.items = files.map(f => {
-            f.path = this._pathPrefix  + (this._path ? this._path + '/' : '') + f.name;
+            let path = (this._path ? this._path + '/' : '') + f.name;
+            f.path = this._pathPrefix + path;
             f.url = f._file && URL.createObjectURL(f._file);
+            f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
+            if (f.metadata && f.metadata.thumbnail) {
+                f.thumbnail = {fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999))};
+            }
             return f;
         });
         this.size = this.items.length;
     }
 
-	async getInfo() {
+    async getInfo() {
         if (this.size < 0) {
             await this.init();
         }
@@ -388,7 +400,7 @@ export async function install() {
     }
 
     let storageWrapper = new WebkitFileSystemWrapper(true);
- 
+
     if (!storageWrapper.available()) {
         console.log("webkitFileSystem is not supported.");
         return false;
