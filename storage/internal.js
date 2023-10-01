@@ -266,7 +266,7 @@ class StorageList extends ArrayFileList {
         globalThis.storageAccessors['MEDIA'] = {
             name: "Media",
             entrypoints: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
-            getFolder: (path, prefix) => new JsonFileList('../api/' + path, path, prefix),
+            getFolder: (path, prefix) => new JsonFileList('/api/' + path, path, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
     }

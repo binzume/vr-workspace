@@ -3,14 +3,12 @@ import { WebkitFileSystemWrapper, install as installWebkitFs } from './webkit-fi
 import { GoogleApiLoader, install as installGoogleDrive } from './google-drive.js';
 import './files.js';
 
-const storageType = window.PERSISTENT; // PERSISTENT or TEMPORARY;
 const authScope = 'https://www.googleapis.com/auth/drive';
 
 let googleApiLoader = new GoogleApiLoader();
-let storageWrapper = new WebkitFileSystemWrapper(storageType);
+let storageWrapper = new WebkitFileSystemWrapper(true);
 
 let currentStorage = 'WebkitFileSystem';
-let currentFolder = null;
 
 function formatSize(size) {
     if (size == null) { return ''; }
@@ -75,7 +73,7 @@ async function chedckWebkitFileSystemStatus() {
     statusEl.innerText = "Initializing WebkitFs...";
     await installWebkitFs();
 
-    statusEl.innerText = `Ok (Usage: ${formatSize(quota.usedBytes)} / ${formatSize(quota.grantedBytes)}B)`;
+    statusEl.innerText = `Ok (Usage: ${formatSize(quota.usedBytes)} / ${formatSize(quota.grantedBytes)})`;
 
     if (currentStorage == 'WebkitFileSystem') {
         await refreshFileList();
@@ -90,7 +88,7 @@ function initGoogleDriveUI() {
     let enableEl = document.querySelector('#google-drive-enable');
     enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
     enableEl.addEventListener('change', async (ev) => {
-        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        storageList.setOptions(storageId, { hidden: !enableEl.checked });
         if (enableEl.checked) {
             chedckGoogleDriveStatus();
         }
@@ -110,12 +108,23 @@ function initLocalFileSystemUI() {
     let enableEl = document.querySelector('#local-filesystem-enable');
     enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
     enableEl.addEventListener('change', async (ev) => {
-        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        storageList.setOptions(storageId, { hidden: !enableEl.checked });
     });
-    (async () => {
+
+    let update = async () => {
+        let quota = await navigator.storage.estimate();
+        document.querySelector('#local-filesystem-status').textContent = `Ok (Usage: ${formatSize(quota.usage)} / ${formatSize(quota.quota)})`;
         let persisted = await navigator.storage.persisted();
         document.querySelector('#local-filesystem-persisted').textContent = persisted ? 'Yes' : 'No';
-    })();
+        document.querySelector('#local-filesystem-persist').style.display = persisted ? 'none' : 'inline';
+
+    };
+    update();
+    document.querySelector('#local-filesystem-persist').addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        await navigator.storage.persist();
+        await update();
+    });
 }
 
 
@@ -124,7 +133,7 @@ function initWebkitFileSystemUI() {
     let enableEl = document.querySelector('#webkit-filesystem-enable');
     enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
     enableEl.addEventListener('change', async (ev) => {
-        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        storageList.setOptions(storageId, { hidden: !enableEl.checked });
         if (enableEl.checked) {
             chedckWebkitFileSystemStatus();
         }
@@ -146,7 +155,7 @@ function initDemoStorageUI() {
     let enableEl = document.querySelector('#demo-storage-enable');
     enableEl.checked = !(storageList.getOptions(storageId) || {}).hidden;
     enableEl.addEventListener('change', async (ev) => {
-        storageList.setOptions(storageId, {hidden: !enableEl.checked});
+        storageList.setOptions(storageId, { hidden: !enableEl.checked });
     });
 }
 
