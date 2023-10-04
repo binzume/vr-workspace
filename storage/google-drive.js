@@ -21,6 +21,7 @@ export class GoogleDrive {
     signOut() {
         gapi.auth2.getAuthInstance().signOut();
     }
+    /** @returns {Promise<{nextPageToken: string, files: any[]}>} */
     async getFiles(folder, limit, pageToken, options) {
         options = options || {};
         // kind, webViewLink
@@ -38,6 +39,7 @@ export class GoogleDrive {
         // application/vnd.google-apps.folder
         return response.result;
     }
+    /** @returns {Promise<any[]>} */
     async getFile(fileId) {
         let response = await gapi.client.drive.files.get({
             fileId: fileId,
@@ -48,6 +50,19 @@ export class GoogleDrive {
             return null;
         }
         return response.result;
+    }
+    /** @returns {Promise<any[]>} */
+    async getFileByName(folder, name) {
+        let response = await gapi.client.drive.files.list({
+            fields: "nextPageToken, files(id, name, size, mimeType, modifiedTime, iconLink, thumbnailLink)",
+            q: "trashed=false and '" + (folder || 'root') + "' in parents and name='" + name + "'",
+            pageSize: 10,
+            spaces: "drive"
+        });
+        if (!response || response.status != 200) {
+            return null;
+        }
+        return response.result.files;
     }
     async create(name, content, mimeType, folder) {
         return await gapi.client.drive.files.create({
@@ -140,8 +155,21 @@ class GoogleDriveFileList {
         }
         let result = await this.drive.getFiles(this._folderId, limit, offset ? offset : null, driveOption);
         signal?.throwIfAborted();
+        return {
+            items: result.files.map(f => this._procFile(f)),
+            next: result.nextPageToken
+        };
+    }
+    async getFile(name) {
+        let files = await this.drive.getFileByName(this._folderId, name);
+        if (files && files.length) {
+            return this._procFile(files[0]);
+        }
+        return null;
+    }
+    _procFile(f) {
         let drive = this.drive;
-        let files = result.files.map(f => ({
+        return {
             type: f.mimeType == "application/vnd.google-apps.folder" ? "folder" : f.mimeType,
             duration: 0,
             id: f.id,
@@ -154,10 +182,6 @@ class GoogleDriveFileList {
             fetch(start, end) { return drive.fetch(this.id, start, end); },
             update(blob) { return drive.update(this.id, blob); },
             remove() { return drive.remove(this.id); },
-        }));
-        return {
-            items: files,
-            next: result.nextPageToken
         };
     }
     /**
@@ -230,6 +254,7 @@ export async function install() {
 
     globalThis.storageAccessors = globalThis.storageAccessors || {};
     globalThis.storageAccessors["GoogleDrive"] = {
+        writable: true,
         name: "Google Drive",
         root: 'root',
         getFolder: (folder, prefix) => new GoogleDriveFileList(folder, drive, prefix),

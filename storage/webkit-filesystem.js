@@ -103,8 +103,8 @@ class FileSystemWrapper {
         await writer.close();
     }
 
-    async getFile(path) {
-        let handle = await this.resolvePath(path, 'file', false);
+    async getFile(path, options = {}) {
+        let handle = await this.resolvePath(path, 'file', options.create);
         return await this.statInternal(handle);
    }
 
@@ -275,7 +275,7 @@ export class WebkitFileSystemWrapper {
         }
     }
 
-    async getFile(path) {
+    async getFile(path, options = {}) {
         if (!this.filesystem) {
             await this.requestFileSystem();
         }
@@ -312,11 +312,6 @@ export class WebkitFileSystemWrapper {
             size: file?.size,
             updatedTime: file ? file.lastModified : null,
             remove() { return new Promise((resolve, reject) => entry.remove(resolve, reject)); },
-            async update(blob) {
-                await storage.writeFile(entry.fullPath, blob);
-                this.size = blob.size;
-                return this;
-            },
             _file: file,
         };
     }
@@ -342,6 +337,12 @@ class WebkitFileSystemWrapperFileList {
         f.path = this._pathPrefix + path;
         f.url = f._file && URL.createObjectURL(f._file);
         f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
+        f.update = async (blob) => {
+            await this._storage.writeFile(path, blob);
+            f.size = blob.size;
+            f.type = blob.type;
+            return this;
+        };
         if (f.metadata && f.metadata.thumbnail) {
             f.thumbnail = {fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999))};
         }
@@ -396,8 +397,8 @@ class WebkitFileSystemWrapperFileList {
         return this._storage.writeFile(this._path + '/' + name, blob, options);
     }
 
-    async getFile(name) {
-        return this._procFile(await this._storage.getFile(this._path + '/' + name));
+    async getFile(name, options = {}) {
+        return this._procFile(await this._storage.getFile(this._path + '/' + name, options));
     }
 
     getParentPath() {
@@ -413,6 +414,7 @@ export async function install() {
     if (stdStorageWrapper.available()) {
         globalThis.storageAccessors = globalThis.storageAccessors || {};
         globalThis.storageAccessors['local'] = {
+            writable: true,
             name: "Local",
             getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, stdStorageWrapper, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
@@ -438,6 +440,7 @@ export async function install() {
 
     globalThis.storageAccessors = globalThis.storageAccessors || {};
     globalThis.storageAccessors['WebkitFileSystem'] = {
+        writable: true,
         name: "WebkitLocal",
         getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : [],

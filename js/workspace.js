@@ -85,7 +85,7 @@ class AppManager {
 			el.setAttribute('window-locator', '');
 		}
 		let services = { appManager: this, storageManager: globalThis.storageList };
-		let getDataFolder = () => globalThis.storageList.getFolder('local/' + app.id + '/data');
+		let getDataFolder = () => globalThis.storageList.getFolder('local/app-data/' + app.id);
 		let onstart = () => el.emit('app-start', { appManager: this, app: app, services: services, getDataFolder: getDataFolder, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
 			onstart();
@@ -137,7 +137,7 @@ class AppManager {
 		// @ts-ignore
 		let storageList = globalThis.storageList;
 		// TODO: File select dialog.
-		let accessor = Object.values(storageList.accessors).find(a => a.writable && a.writeFile);
+		let accessor = Object.values(storageList.accessors).find(a => a.writable);
 		if (!accessor) {
 			return Promise.reject('no writable storage');
 		}
@@ -146,7 +146,7 @@ class AppManager {
 			type: contentType,
 			name: name,
 			update(blob) {
-				return accessor.writeFile(name, blob);
+				return accessor.getFolder('').writeFile(name, blob);
 			}
 		});
 	}
