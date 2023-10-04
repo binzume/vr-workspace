@@ -8,7 +8,7 @@ const authScope = 'https://www.googleapis.com/auth/drive';
 let googleApiLoader = new GoogleApiLoader();
 let storageWrapper = new WebkitFileSystemWrapper(true);
 
-let currentStorage = 'WebkitFileSystem';
+let currentStorage = 'local';
 
 function formatSize(size) {
     if (size == null) { return ''; }
@@ -45,7 +45,7 @@ async function chedckGoogleDriveStatus() {
 
 function refreshFileList() {
     if (globalThis.fileListView) {
-        globalThis.fileListView.selectList(globalThis.fileListView.path || 'WebkitFileSystem');
+        globalThis.fileListView.selectList(globalThis.fileListView.path || 'local');
     }
 }
 
