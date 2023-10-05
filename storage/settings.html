@@ -79,6 +79,7 @@
 			<button id="item-list-mode-button" class="rounded-button material-icons">view_list</button>
 			<button id="item-sort-order-button" class="rounded-button">&#x2193;</button>
 			<button id="item-sort-button" class="rounded-button"><span class="material-icons">sort</span><span id="item-sort-label"></span></button>
+			<button id="add-item-button" class="rounded-button"><span class="material-icons">add</span></button>
 		</div>
 		<ul id="sort-order-list" class='popup' style="right:8pt">
 			<li><button data-sort-order="updatedTime">Last modified</button></li>
@@ -86,9 +87,10 @@
 			<li><button data-sort-order="size">Size</button></li>
 			<li><button data-sort-order="type">Type</button></li>
 		</ul>
-
-        <button id='file-add-button' class='file-menu-write'>Add File</button>
-        <button id='file-mkdir-button' class='file-menu-write'>Mkdir</button>
+		<ul id="add-item-list" class='popup' style="right:8pt">
+			<li><button id='file-add-button'>File</button></li>
+			<li><button id='file-mkdir-button'>Folder</button></li>
+		</ul>
 
 		<ul class="grid" id="item-list">
 		</ul>

@@ -428,6 +428,13 @@ fieldset.group legend {
 	}
 }
 
+#main-pane #add-item-button {
+	display: none;
+}
+#main-pane.writable-folder #add-item-button {
+	display: inline-block;
+}
+
 #main-pane .loading-spinner {
 	display: none;
     padding: 20px;

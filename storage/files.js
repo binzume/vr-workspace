@@ -730,6 +730,7 @@ class FileListView {
 		if (folder == null) {
 			return;
 		}
+		folder.writeFile ? this.el.classList.add('writable-folder') : this.el.classList.remove('writable-folder');
 		this.listCursor = new FileListCursor(folder, isPlayable, this.listCursor.options);
 		mediaPlayerController.setCursor(this.listCursor);
 		this.listCursor.loaded = r => this._onGetItemsResult(r);
@@ -979,6 +980,7 @@ window.addEventListener('DOMContentLoaded', (function (e) {
 	initPopup('menu-button', 'menu-pane', 'override_menu_visible');
 	initPopup('option-menu-button', 'option-menu', 'active');
 	initPopup('item-sort-button', 'sort-order-list', 'active');
+	initPopup('add-item-button', 'add-item-list', 'active');
 	eachElements('#menu-hide-toggle', (el) => {
 		el.addEventListener('click', (ev) => {
 			ev.preventDefault();
