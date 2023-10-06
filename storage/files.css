@@ -724,6 +724,18 @@ ul.grid {
 	margin: 0 3px;
 	padding: 0;
 }
+@media screen and (max-width: 580px) {
+	ul.grid {
+		grid-template-columns: repeat(auto-fill, 33%);
+		margin: 0 1px;
+	}
+}
+@media screen and (max-width: 320px) {
+	ul.grid {
+		grid-template-columns: repeat(auto-fill, 50%);
+		grid-auto-rows: 100pt;
+	}
+}
 
 ul.grid li {
 	position: relative;
@@ -733,7 +745,7 @@ ul.grid li {
 	border-radius: 4pt;
 	list-style-type: none;
 	padding: 0;
-	margin: 0 1pt;
+	margin: 0 1px;
 	box-sizing: border-box;
 	line-height: 1.1;
 	overflow: hidden;
