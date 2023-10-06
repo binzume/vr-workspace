@@ -410,9 +410,9 @@ class WebkitFileSystemWrapperFileList {
 }
 
 export async function install() {
+    globalThis.storageAccessors = globalThis.storageAccessors || {};
     let stdStorageWrapper = new FileSystemWrapper(null, navigator.storage);
     if (stdStorageWrapper.available()) {
-        globalThis.storageAccessors = globalThis.storageAccessors || {};
         globalThis.storageAccessors['local'] = {
             writable: true,
             name: "Local",
@@ -438,13 +438,22 @@ export async function install() {
     // await storageWrapper.requestQuota(storageSize);
     // await storageWrapper.writeFile("test.txt", new Blob(["Hello!"]));
 
-    globalThis.storageAccessors = globalThis.storageAccessors || {};
     globalThis.storageAccessors['WebkitFileSystem'] = {
         writable: true,
         name: "WebkitLocal",
         getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
     };
+    if (!stdStorageWrapper.available()) {
+        // fallback
+        globalThis.storageAccessors['local'] = {
+            writable: true,
+            name: "Local",
+            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
+            parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
+        };
+    }
+
     return true;
 }
 

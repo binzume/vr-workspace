@@ -191,7 +191,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
         if (!folder || !folder.mkdir) {
             return;
         }
-        let dir = prompt('mkdir');
+        let dir = prompt('Folder name:');
         if (!dir) {
             return;
         }
