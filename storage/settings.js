@@ -8,8 +8,6 @@ const authScope = 'https://www.googleapis.com/auth/drive';
 let googleApiLoader = new GoogleApiLoader();
 let storageWrapper = new WebkitFileSystemWrapper(true);
 
-let currentStorage = 'local';
-
 function formatSize(size) {
     if (size == null) { return ''; }
     if (size > 1024 * 1024 * 1024 * 10) { return (size / (1024 * 1024 * 1024) | 0) + 'GiB'; }
@@ -38,7 +36,7 @@ async function chedckGoogleDriveStatus() {
     await installGoogleDrive();
 
     statusEl.innerText = "Ok";
-    if (currentStorage == 'GoogleDrive') {
+    if (getCurrentStorage() == 'GoogleDrive') {
         await refreshFileList();
     }
 }
@@ -50,10 +48,12 @@ function refreshFileList() {
 }
 
 function getCurrentFolder() {
-    if (globalThis.fileListView && globalThis.fileListView.listCursor && globalThis.fileListView.listCursor._folder) {
-        return globalThis.fileListView.listCursor._folder;
-    }
-    return null;
+    return globalThis.fileListView && globalThis.fileListView.getCurrentFolder();
+}
+
+function getCurrentStorage() {
+    let folder = getCurrentFolder();
+    return folder && folder.backend;
 }
 
 async function chedckWebkitFileSystemStatus() {
@@ -75,7 +75,7 @@ async function chedckWebkitFileSystemStatus() {
 
     statusEl.innerText = `Ok (Usage: ${formatSize(quota.usedBytes)} / ${formatSize(quota.grantedBytes)})`;
 
-    if (currentStorage == 'WebkitFileSystem') {
+    if (getCurrentStorage() == 'WebkitFileSystem') {
         await refreshFileList();
     }
 }
@@ -164,56 +164,5 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
     initGoogleDriveUI();
     initWebkitFileSystemUI();
     initDemoStorageUI();
-
-    document.querySelector('#file-add-button').addEventListener('click', (ev) => {
-        ev.preventDefault();
-        let folder = getCurrentFolder();
-        if (!folder || !folder.writeFile) {
-            return;
-        }
-        let inputEl = Object.assign(document.createElement('input'), {
-            type: `file`, multiple: true, style: "display:none", async onchange() {
-                let tasks = [];
-                for (let file of inputEl.files) {
-                    tasks.push(folder.writeFile(file.name, file));
-                }
-                document.body.removeChild(inputEl);
-                await Promise.all(tasks);
-                refreshFileList(); // TODO: update quata dispaly    
-            }
-        });
-        document.body.appendChild(inputEl).click();
-    });
-
-    document.querySelector('#file-mkdir-button').addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        let folder = getCurrentFolder();
-        if (!folder || !folder.mkdir) {
-            return;
-        }
-        let dir = prompt('Folder name:');
-        if (!dir) {
-            return;
-        }
-        await folder.mkdir(dir);
-        refreshFileList();
-    });
-
-    let onHashChanged = () => {
-        if (!location.hash) {
-            return;
-        }
-        let fragment = location.hash.slice(1);
-        let m = fragment.match(/list:(\w+)\/?(.*)/)
-        if (m) {
-            currentStorage = m[1];
-        }
-    };
-    onHashChanged();
-    window.addEventListener('hashchange', (function (ev) {
-        ev.preventDefault();
-        onHashChanged();
-    }), false);
     refreshFileList();
-
 }, { once: true });

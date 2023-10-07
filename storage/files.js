@@ -675,7 +675,7 @@ class FileListView {
 			}
 		}, false);
 		this.el.addEventListener('dragover', ev => {
-			if (this.listCursor._folder?.writeFile) {
+			if (this.getCurrentFolder()?.writeFile) {
 				ev.preventDefault();
 			}
 		});
@@ -683,9 +683,42 @@ class FileListView {
 			ev.preventDefault();
 			let tasks = [];
 			for (let file of ev.dataTransfer.files) {
-				tasks.push(this.listCursor._folder.writeFile(file.name, file));
+				tasks.push(this.getCurrentFolder().writeFile(file.name, file));
 			}
 			Promise.all(tasks).then(() => this._refreshItems());
+		});
+		document.querySelector('#file-add-button').addEventListener('click', (ev) => {
+			ev.preventDefault();
+			let folder = this.getCurrentFolder();
+			if (!folder || !folder.writeFile) {
+				return;
+			}
+			let inputEl = Object.assign(document.createElement('input'), {
+				type: `file`, multiple: true, style: "display:none", onchange: async () => {
+					let tasks = [];
+					for (let file of inputEl.files) {
+						tasks.push(folder.writeFile(file.name, file));
+					}
+					document.body.removeChild(inputEl);
+					await Promise.all(tasks);
+					this._refreshItems();
+				}
+			});
+			document.body.appendChild(inputEl).click();
+		});
+
+		document.querySelector('#file-mkdir-button').addEventListener('click', async (ev) => {
+			ev.preventDefault();
+			let folder = this.getCurrentFolder();
+			if (!folder || !folder.mkdir) {
+				return;
+			}
+			let dir = prompt('Folder name:');
+			if (!dir) {
+				return;
+			}
+			await folder.mkdir(dir);
+			this._refreshItems()
 		});
 	}
 
@@ -718,6 +751,10 @@ class FileListView {
 		listTitleEl.appendChild(mkEl('span', name[1] || name[0]));
 		this.path = path;
 		this._refreshItems();
+	}
+
+	getCurrentFolder() {
+		return this.listCursor._folder;
 	}
 
 	_refreshItems() {

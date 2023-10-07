@@ -141,18 +141,18 @@ class FileSystemWrapper {
     }
 
     /**
-     * @param {FileSystemHandle2} handle 
+     * @param {FileSystemFileHandle|FileSystemDirectoryHandle} handle 
      */
     async statInternal(handle) {
         if (handle.kind == 'file') {
             let f = await handle.getFile();
-            let stat = { type: f.type || 'file', name: f.name, size: f.size, updatedTime: f.lastModified, _file: f }
+            let stat = { type: f.type || 'file', name: f.name, size: f.size, updatedTime: f.lastModified, _file: f, _handle: handle }
             if (["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"].includes(f.type)) {
                 stat.metadata = { thumbnail: "#thumbnail.jpeg" };
             }
             return stat;
         } else {
-            return { type: 'folder', size: 0, name: handle.name, updatedTime: null }
+            return { type: 'folder', size: 0, name: handle.name, updatedTime: null, _handle: handle }
         }
     }
 
@@ -305,7 +305,6 @@ export class WebkitFileSystemWrapper {
     }
     async statInternal(entry) {
         let file = entry.isFile ? (await new Promise((resolve, reject) => entry.file(resolve, reject))) : null;
-        let storage = this;
         return {
             name: entry.name,
             type: entry.isFile ? file.type : 'folder',
@@ -318,12 +317,13 @@ export class WebkitFileSystemWrapper {
 }
 
 class WebkitFileSystemWrapperFileList {
-    constructor(path, storage, prefix = '') {
+    constructor(path, storage, prefix = '', backend = '') {
         this._storage = storage;
         this._pathPrefix = prefix;
         this._path = path;
         this.items = [];
         this.size = -1;
+        this.backend = backend;
     }
 
     async init() {
@@ -337,6 +337,9 @@ class WebkitFileSystemWrapperFileList {
         f.path = this._pathPrefix + path;
         f.url = f._file && URL.createObjectURL(f._file);
         f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
+        if (f._handle && f._handle.move) {
+            f.rename = async (name) => f._handle.move(name);
+        }
         f.update = async (blob) => {
             await this._storage.writeFile(path, blob);
             f.size = blob.size;
@@ -416,7 +419,7 @@ export async function install() {
         globalThis.storageAccessors['local'] = {
             writable: true,
             name: "Local",
-            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, stdStorageWrapper, prefix),
+            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, stdStorageWrapper, prefix, 'Local'),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
         };
     }
@@ -441,7 +444,7 @@ export async function install() {
     globalThis.storageAccessors['WebkitFileSystem'] = {
         writable: true,
         name: "WebkitLocal",
-        getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
+        getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix, 'WebkitFileSystem'),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
     };
     if (!stdStorageWrapper.available()) {
@@ -449,7 +452,7 @@ export async function install() {
         globalThis.storageAccessors['local'] = {
             writable: true,
             name: "Local",
-            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix),
+            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix, 'WebkitFileSystem'),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
         };
     }

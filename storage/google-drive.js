@@ -130,6 +130,7 @@ class GoogleDriveFileList {
         this.onupdate = null;
         this.sequentialAccess = true;
         this._pathPrefix = pathPrefix;
+        this.backend = 'GoogleDrive';
     }
     async getInfo() {
         if (!this._name) {
