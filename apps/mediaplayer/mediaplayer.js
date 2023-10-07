@@ -499,9 +499,9 @@ AFRAME.registerComponent('media-selector', {
 			return;
 		}
 		if (folder.sequentialAccess) {
-			this.itemlist = new ArrayFolderLoader(folder, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
+			this.itemlist = new ArrayFolderLoader(folder, path, { sortField: this.data.sortField, sortOrder: this.data.sortOrder });
 		} else {
-			this.itemlist = new CachedFolderLoader(folder, path, { orderBy: this.data.sortField, order: this.data.sortOrder });
+			this.itemlist = new CachedFolderLoader(folder, path, { sortField: this.data.sortField, sortOrder: this.data.sortOrder });
 		}
 
 		this.el.setAttribute("title", "Loading...");
