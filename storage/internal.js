@@ -31,7 +31,10 @@ class JsonFileList extends BaseFileList {
 
     async getFiles(offset, limit, options = null, signal = null) {
         options ||= {};
-        let params = "?offset=" + offset + "&limit=" + limit;
+        let params = "?offset=" + offset;
+        if (limit) params += "&limit=" + limit;
+        if (options.sortField) params += "&orderBy=" + options.sortField;
+        if (options.sortOrder) params += "&order=" + options.sortOrder;
         if (options.orderBy) params += "&orderBy=" + options.orderBy;
         if (options.order) params += "&order=" + options.order;
         let response = await fetch(this._url + params, { signal: signal });

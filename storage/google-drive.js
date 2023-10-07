@@ -149,10 +149,13 @@ class GoogleDriveFileList {
     async getFiles(offset, limit, options = null, signal = null) {
         options = options || {};
         let driveOption = options.driveOptions || {};
-        if (options.orderBy == "name") {
-            driveOption.orderBy = "name" + (options.order == "d" ? " desc" : "");
-        } else if (options.orderBy == "updated") {
-            driveOption.orderBy = "modifiedTime" + (options.order == "d" ? " desc" : "");
+        let order = options.sortOrder == "d" ? " desc" : "";
+        if (options.sortField == "name") {
+            driveOption.orderBy = "name" + order;
+        } else if (options.sortField == "updatedTime") {
+            driveOption.orderBy = "modifiedTime" + order;
+        } else if (options.sortField == "size") {
+            driveOption.orderBy = "quotaBytesUsed" + order;
         }
         let result = await this.drive.getFiles(this._folderId, limit, offset ? offset : null, driveOption);
         signal?.throwIfAborted();

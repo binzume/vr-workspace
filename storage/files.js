@@ -889,6 +889,17 @@ class FileListView {
 				}
 			})));
 		}
+		if (f.rename) {
+			optionEls.push(mkEl('li', mkEl('button', 'Rename', {
+				onclick: async () => {
+					let name = prompt('Rename', f.name);
+					if (name != f.name) {
+						await f.rename(name);
+						this._refreshItems();
+					}
+				}
+			})));
+		}
 		if (optionEls.length > 0) {
 			optionEls.push(mkEl('li', mkEl('button', 'Info', {
 				onclick: () => {
