@@ -9,6 +9,11 @@ AFRAME.registerComponent('task-manager', {
 			this.el.addEventListener('app-save-state', async (ev) => {
 				ev.detail.skip();
 			});
+			if (ev.detail.content) {
+				this.el.parentElement.removeChild(this.el);
+				let session = await (await ev.detail.content.fetch()).json();
+				this._appManager.restoreWorkspace(session);
+			}
 		}, { once: true });
 	},
 	remove() {
@@ -28,7 +33,7 @@ AFRAME.registerComponent('task-manager', {
 			localStorage.setItem('taskmgr-' + name,json);
 			return;
 		}
-		await folder.writeFile(name + '.json', new Blob([json], {type: 'application/json'}), {mkdir: true});
+		await folder.writeFile(name + '.session.json', new Blob([json], {type: 'application/json'}), {mkdir: true});
 	},
 	async _loadJson(name) {
 		let folder = this._appFolder();
@@ -36,7 +41,7 @@ AFRAME.registerComponent('task-manager', {
 			let json = localStorage.getItem('taskmgr-' + name);
 			return json ? JSON.parse(json) : null;
 		}
-		let file = await folder.getFile(name + '.json');
+		let file = await folder.getFile(name + '.session.json');
 		return await (await file.fetch()).json();
 	},
 	_initRunningAppList() {
