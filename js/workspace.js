@@ -4,7 +4,6 @@
 /// <reference path="types.d.ts" />
 /** 
  * @typedef {{name: string; type: string; url: string; fetch:((pos?:number)=>Promise<Response>)?; size: number?}} ContentInfo
- * @typedef {{id:string; name:string; type:string; url:string; hidden:boolean; wid:string?;contentTypes:string[]}} AppInfo
  */
 class AppManager {
 	constructor() {
@@ -27,8 +26,10 @@ class AppManager {
 			if (el.id) {
 				let type = el.dataset.apptype || 'app';
 				let contentTypes = el.dataset.contentType?.split(',') ?? [];
+				let contentNameSuffix = el.dataset.contentNameSuffix?.split(',') ?? [];
 				let hidden = el.classList.contains('hidden');
-				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.getAttribute('href'), hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes };
+				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.getAttribute('href'),
+					hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes, contentNameSuffix: contentNameSuffix };
 				apps.push(app);
 			}
 		}
@@ -61,10 +62,6 @@ class AppManager {
 		return [];
 	}
 
-	launch(id, sceneEl = null, options = {}) {
-		return start(id, sceneEl, options);
-	}
-
 	/**
 	 * @param {string} id 
 	 * @param {Element} sceneEl
@@ -84,7 +81,7 @@ class AppManager {
 		if (!options.disableWindowLocator && el && el.tagName == 'A-XYWINDOW' && !el.hasAttribute('window-locator')) {
 			el.setAttribute('window-locator', '');
 		}
-		let services = { appManager: this, storageManager: globalThis.storageList };
+		let services = { appManager: this, storage: globalThis.storageList };
 		let getDataFolder = () => globalThis.storageList.getFolder('local/app-data/' + app.id);
 		let onstart = () => el.emit('app-start', { appManager: this, app: app, services: services, getDataFolder: getDataFolder, args: options.appArgs, content: options.content, restoreState: options.restoreState }, false);
 		if (el.hasLoaded) {
@@ -134,9 +131,10 @@ class AppManager {
 	 * @returns {Promise<object>}
 	 */
 	async newContent(contentType, options = {}) {
-		// @ts-ignore
 		let storageList = globalThis.storageList;
 		// TODO: File select dialog.
+		/** @type {FolderResolver} */
+		// @ts-ignore
 		let accessor = Object.values(storageList.accessors).find(a => a.writable);
 		if (!accessor) {
 			return Promise.reject('no writable storage');
@@ -157,8 +155,12 @@ class AppManager {
 	 */
 	defailtContentHandler(content, options) {
 		let contentType = content.type.split(';')[0];
+		let contentName = content.name || '';
 		let app =
 			this.apps.find(app => app.contentTypes && app.contentTypes.includes(contentType)) ||
+			this.apps.find(app => app.contentNameSuffix && app.contentNameSuffix.some(t =>
+				contentName.endsWith(t)
+			)) ||
 			this.apps.find(app => app.contentTypes && app.contentTypes.some(t =>
 				t.includes('*') && new RegExp(t.replace('*', '[^/]+')).test(contentType) // TODO: glob
 			));
@@ -288,7 +290,7 @@ class AppManager {
 
 	/**
 	 * @param {Element} sceneEl
-	 * @returns {NodeListOf<Element>}
+	 * @returns {NodeListOf<import('aframe').Entity>}
 	 */
 	getRunningApps(sceneEl = null) {
 		return (sceneEl || document).querySelectorAll('[vrapp]');
@@ -771,11 +773,7 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 		m = fragment.match(/list:(.+)/);
 		if (m) {
 			let path = 'MEDIA/' + decodeURI(m[1]);
-			let mediaList = await window.appManager.start('app-media-selector', null, { appArgs: path });
-			let play = fragment.match(/play:(\d+)/);
-			if (play) {
-				mediaList.components['media-selector'].mediaSelector.movePos(play[1]);
-			}
+			await window.appManager.start('app-media-selector', null, { appArgs: path });
 		}
 	}
 }, { once: true });
