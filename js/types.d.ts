@@ -10,8 +10,8 @@ declare module "aframe" {
         thumbstickmoved: DetailEvent<{ x: number, y: number }>
         object3dset: DetailEvent<{ object: any }>
         gesture: DetailEvent<{ name: string, center: any }>
-        'app-start': DetailEvent<{ appManager: AppManager, app: any, services: {appManager: AppManager, [key: string]: any}, args: any, content: any }>
-        'app-save-state': DetailEvent<{ setState: (any) => void, skip: () => void }>
+        'app-start': DetailEvent<AppStartEventData>
+        'app-save-state': DetailEvent<AppSaveStateEventData>
     }
 
     export interface Entity {
@@ -30,7 +30,7 @@ declare module "aframe" {
         addEventListener<K extends keyof EntityEventMap>(
             type: K,
             listener: (event: Event & EntityEventMap[K]) => void,
-            useCapture?: boolean | { once?: boolean 
+            useCapture?: boolean | { once?: boolean }
         ): void;
     }
 }
@@ -47,6 +47,32 @@ declare global {
         querySelectorAll(selectors: string): NodeListOf<Entity<any>>
     }
 
+    // App Manager types
+    interface AppInfo {
+        id: string;
+        name: string;
+        type: string;
+        url: string;
+        contentTypes: string[];
+        contentNameSuffix: string[];
+        hidden: boolean;
+        wid: string?;
+    }
+
+    interface AppStartEventData {
+        app: AppInfo;
+        services: { appManager: AppManager, storage?: FolderResolver&Folder, [key: string]: any };
+        appManager: AppManager;
+        args: any;
+        content: any;
+        getDataFolder(): Folder;
+    }
+    interface AppSaveStateEventData {
+        setState(any): void;
+        skip(): void
+    }
+
+    // Storage types
     interface FileInfo {
         type: string;
         name: string;
@@ -56,6 +82,7 @@ declare global {
         tags?: string[];
         thumbnail?: { [k: string]: any };
         remove?(): Promise<any>;
+        rename?(name: string): Promise<any>;
         fetch?(): Promise<any>;
         [k: string]: any;
     }
@@ -69,12 +96,16 @@ declare global {
     }
 
     interface Folder {
-        path?: string;
         getInfo?(): Promise<{ name: string, [k: string], any }>;
         getFiles(offset: any, limit: number, options: object, signal: AbortSignal): Promise<FilesResult>;
-        writeFile?(name: string, content: any): Promise<any>;
+        getFile(name: string, options: any): Promise<FileInfo>;
+        writeFile?(name: string, content: Blob): Promise<any>;
+        mkdir(name: string): string;
         getParentPath(): string;
         onupdate?: () => any;
+        path?: string;
+        sequentialAccess?: boolean;
+        backend?: string;
     }
 
     interface FolderResolver {
