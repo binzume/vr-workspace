@@ -1,4 +1,3 @@
-// @ts-check
 'use strict';
 
 class TextPoint {
@@ -55,9 +54,15 @@ class MultilineText {
 		this._lines = [new TextLine('')];
 		this.scrollY = 0;
 		this.scrollX = 0;
-		this.caret = null;
 		this.selection = null;
 		this.textChanged = null;
+		this.onrefresh = null;
+		this.styleLine = null;
+
+		this._undoLmit = options.undoLimit || 2000;
+		this._undoBuffer = [];
+		this._redoBuffer = [];
+
 		this._maxWidth = 0;
 		this._textureLines = [];
 		this._textureFreeLines = [];
@@ -70,10 +75,6 @@ class MultilineText {
 		this._lineMeshes = [];
 		this._fontResolution = options.fontResolution || 32;
 		this._font = options.font || 'sans-serif';
-
-		this._undoLmit = options.undoLimit || 2000;
-		this._undoBuffer = [];
-		this._redoBuffer = [];
 
 		this.setSize(width, height, lineHeight);
 	}
@@ -100,7 +101,7 @@ class MultilineText {
 		this._canvasCtx.textBaseline = 'top';
 
 		for (let i = 0; i < textureLines; i++) {
-			let geom = new THREE.PlaneBufferGeometry(width, lineHeight);
+			let geom = new THREE.PlaneGeometry(width, lineHeight);
 			let uv = geom.attributes.uv;
 			for (let j = 0; j < uv.count; j++) {
 				uv.setY(j, (uv.getY(j) + textureLines - i - 1) / textureLines);
@@ -242,7 +243,7 @@ class MultilineText {
 
 	getPositionFromLocal(localPos) {
 		let l = Math.max(Math.min(Math.floor(-localPos.y / this.lineHeight), this._lines.length - 1), 0);
-		let c = this._getCol(l, (localPos.x / this.width + 0.5) * this._canvas.width);
+		let c = this._getCol(this._lines[l].text, (localPos.x / this.width + 0.5) * this._canvas.width);
 		return new TextPoint(l, c);
 	}
 
@@ -265,17 +266,14 @@ class MultilineText {
 		}
 		this.object3D.position.set(0, this.lineHeight * this.scrollY + this.height / 2, 0.01);
 
-		// TODO callback
-		if (this.caret) {
-			this.caret._refresh();
-		}
+		this.onrefresh && this.onrefresh();
 	}
 
 	/**
 	 * @param {TextPoint} p
 	 * @param {boolean} moveLine 
 	 */
-	validatePosition(p, moveLine = true) {
+	validatePosition(p, moveLine = true, d = false) {
 		if (moveLine && p.line > 0 && p.column < 0) {
 			p.line--;
 			p.column += this._lines[p.line].text.length + 1;
@@ -285,7 +283,11 @@ class MultilineText {
 			p.line++;
 		}
 		p.line = Math.max(Math.min(p.line, this._lines.length - 1), 0);
-		p.column = Math.max(Math.min(p.column, this._lines[p.line].text.length), 0);
+		let text = this._lines[p.line].text;
+		p.column = Math.max(Math.min(p.column, text.length), 0);
+		if (p.column && text[p.column] >= '\uDC00' && text[p.column] <= '\uDFFF') {
+			p.column += d ? 1 : -1;
+		}
 		return p;
 	}
 
@@ -327,6 +329,18 @@ class MultilineText {
 		}
 	}
 
+	_setLine(l, text) {
+		let line = this._lines[l];
+		if (line == null || line.text == text) {
+			return;
+		}
+		line.text = text;
+		if (line.visible) {
+			this._drawLine(line, l);
+		}
+		this.textChanged && this.textChanged();
+	}
+
 	_showLine(line, l) {
 		if (line == null || line.visible) {
 			return;
@@ -352,41 +366,54 @@ class MultilineText {
 	}
 
 	_drawLine(line, l) {
+		let fragments = [[0, line.text.length, 'white', null]];
+		let selection = this.selection;
+		let setColor = (s, e, fg, bg) => {
+			for (let i = 0; i < fragments.length; i++) {
+				let f = fragments[i], fs = f[0], fe = f[1];
+				if (e <= fs) { break; }
+				if (s < fe) {
+					if (s > fs) {
+						fragments.splice(i, 0, [fs, s, f[2], f[3]]);
+						i++;
+					}
+					fragments[i] = [Math.max(s, fs), Math.min(e, fe), fg || f[2], bg || f[3]];
+					if (e < fe) {
+						fragments.splice(i + 1, 0, [e, fe, f[2], f[3]]);
+						i++;
+					}
+				}
+			}
+		};
+		this.styleLine && this.styleLine(line, setColor, l);
+		if (selection && l >= selection.min().line && l <= selection.max().line) {
+			let min = selection.min(), max = selection.max();
+			let s = min.line == l ? min.column : 0;
+			let e = max.line == l ? max.column : line.text.length;
+			setColor(s, e, 'yellow', 'blue');
+		}
+		line.width = this._drawLineFragments(line, fragments);
+	}
+
+	_drawLineFragments(line, fragments) {
 		let ctx = this._canvasCtx;
 		let y = line.textureLine * this._fontResolution + 1;
 		ctx.clearRect(0, y, this._canvas.width, this._fontResolution);
-
-		let fragments = [];
-		let selection = this.selection;
-		if (selection && l >= selection.min().line && l <= selection.max().line) {
-			let min = selection.min(), max = selection.max();
-			let text = line.text;
-			let s = min.line == l && min.column > 0 ? min.column : 0;
-			let e = max.line == l ? max.column : text.length;
-			if (s > 0) {
-				fragments.push([text.slice(0, s), 'white', null]);
-			}
-			fragments.push([text.slice(s, e), 'yellow', 'blue']);
-			if (e < text.length) {
-				fragments.push([text.slice(e), 'white', null]);
-			}
-		} else {
-			fragments.push([line.text, 'white', null]);
-		}
-
-		line.width = 0;
+		let width = 0;
 		for (let f of fragments) {
-			let w = ctx.measureText(f[0]).width;
-			if (f[2]) {
-				ctx.fillStyle = f[2];
-				ctx.fillRect(line.width - this.scrollX, y, w, this._fontResolution - 1);
+			let text = fragments.length > 1 ? line.text.slice(f[0], f[1]) : line.text;
+			let w = ctx.measureText(text).width;
+			if (f[3]) {
+				ctx.fillStyle = f[3];
+				ctx.fillRect(width - this.scrollX, y, w, this._fontResolution - 1);
 			}
-			ctx.fillStyle = f[1];
-			ctx.fillText(f[0], line.width - this.scrollX, y);
-			line.width += w;
+			ctx.fillStyle = f[2];
+			ctx.fillText(text, width - this.scrollX, y);
+			width += w;
 		}
-		this._maxWidth = Math.max(this._maxWidth, line.width)
+		this._maxWidth = Math.max(this._maxWidth, width)
 		this._texture.needsUpdate = true;
+		return width;
 	}
 
 	_bindTextureLine(line) {
@@ -398,20 +425,7 @@ class MultilineText {
 		line.textureLine = l;
 	}
 
-	_setLine(l, text) {
-		let line = this._lines[l];
-		if (line == null || line.text == text) {
-			return;
-		}
-		line.text = text;
-		if (line.visible) {
-			this._drawLine(line, l);
-		}
-		this.textChanged && this.textChanged();
-	}
-
-	_getCol(l, x) {
-		let str = this._lines[l].text;
+	_getCol(str, x) {
 		let _caretpos = (p) => {
 			let s = str.slice(0, p);
 			return this._canvasCtx.measureText(s).width;
@@ -453,7 +467,7 @@ class MultilineTextCaret {
 		this._textView = textView;
 		this.position = new TextPoint(0, 0);
 		let material = new THREE.MeshBasicMaterial({ color: new THREE.Color(color) });
-		this.obj = new THREE.Mesh(new THREE.PlaneBufferGeometry(width, height), material);
+		this.obj = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
 	}
 	show() {
 		let caretObj = this.obj;
@@ -480,7 +494,7 @@ class MultilineTextCaret {
 	}
 	move(lineOffset, colOffset) {
 		let p = this.position.withOffset(lineOffset, colOffset);
-		this.setPosition(this._textView.validatePosition(p, lineOffset == 0));
+		this.setPosition(this._textView.validatePosition(p, lineOffset == 0, colOffset > 0));
 	}
 	setPosition(p) {
 		this.position.copy(this._textView.validatePosition(p));
@@ -504,10 +518,9 @@ AFRAME.registerComponent('texteditor', {
 		let data = this.data, el = this.el, xyrect = el.components.xyrect;
 		let lineHeight = this.data.lineHeight;
 		this.textView = new MultilineText(xyrect.width, xyrect.height, lineHeight, { font: data.font });
-		if (data.editable) {
-			this.caret = this.textView.caret = new MultilineTextCaret(lineHeight * 0.1, lineHeight * 0.9, this.data.caretColor, this.textView);
-			this.textView.textChanged = () => el.emit('change', {});
-		}
+		this.textView.textChanged = () => el.emit('change', {});
+		this.caret = new MultilineTextCaret(lineHeight * 0.1, lineHeight * 0.9, this.data.caretColor, this.textView);
+		this.textView.onrefresh = () => this.caret._refresh();
 
 		el.setObject3D('texteditor-text', this.textView.object3D);
 
@@ -524,24 +537,49 @@ AFRAME.registerComponent('texteditor', {
 		el.classList.add('collidable');
 		el.setAttribute('tabindex', 0);
 
-		el.addEventListener('click', ev => {
+		let movepos = intersection => {
 			el.focus();
-			let intersection = ev.detail.intersection;
 			if (intersection) {
-				if (!this.caret) {
-					return;
-				}
-				let lp = this.textView.object3D.worldToLocal(intersection.point);
+				let lp = this.textView.object3D.worldToLocal(intersection.point.clone());
 				let pos = this.textView.getPositionFromLocal(lp);
 				this.caret.setPosition(pos);
-				if (this.textView.selection) {
-					// TODO: drag and shift key
-					let range = new TextRange(this.textView.selection.start, pos);
-					this.textView.setSelection(range);
-				}
 			}
-			el.emit('xykeyboard-request', data.type);
+		};
+		el.addEventListener('click', ev => {
+			movepos(ev.detail.intersection);
+			if (data.editable) {
+				el.emit('xykeyboard-request', data.type);
+			}
 		});
+		let timer = null;
+		let ondown = ev => {
+			if (timer) { return; }
+			this.textView.setSelection(null);
+			movepos(ev.detail.intersection);
+			if (!ev.detail.cursorEl || !ev.detail.cursorEl.components.raycaster) {
+				return;
+			}
+			let raycaster = ev.detail.cursorEl.components.raycaster;
+			let range = new TextRange(this.caret.position.clone());
+			timer = setInterval(() => {
+				movepos(raycaster.getIntersection(el));
+				range.end = this.caret.position.clone();
+				if (range.start.column != range.end.column || range.start.line != range.end.line) {
+					this.textView.setSelection(range.clone());
+				} else {
+					this.textView.setSelection(null);
+				}
+			}, 100);
+		};
+		let onup = ev => {
+			clearInterval(timer);
+			timer = null;
+		}
+		this.el.addEventListener('triggerdown', ondown);
+		this.el.addEventListener('mousedown', ondown);
+		this.el.addEventListener('triggerup', onup);
+		this.el.addEventListener('mouseup', onup);
+
 		let oncopy = (ev) => {
 			ev.clipboardData.setData('text/plain', this.textView.selection ? this.textView.getTextRange(this.textView.selection) : this.textView.getText());
 			ev.preventDefault();
@@ -555,14 +593,17 @@ AFRAME.registerComponent('texteditor', {
 			}
 		};
 		let onpaste = (ev) => {
-			this.caret.setPosition(this.textView.insert(this.caret.position, ev.clipboardData.getData('text/plain')));
+			if (!data.editable) { return; }
+			this.insertText(ev.clipboardData.getData('text/plain'));
 			ev.preventDefault();
 		};
 		el.addEventListener('focus', (ev) => {
 			window.addEventListener('copy', oncopy);
 			window.addEventListener('cut', oncut);
 			window.addEventListener('paste', onpaste);
-			this.caret.show();
+			if (data.editable) {
+				this.caret.show();
+			}
 		});
 		el.addEventListener('blur', (ev) => {
 			window.removeEventListener('copy', oncopy);
@@ -571,14 +612,14 @@ AFRAME.registerComponent('texteditor', {
 			this.caret.hide();
 		});
 		el.addEventListener('keypress', (ev) => {
+			if (!data.editable) { return; }
 			if (ev.ctrlKey && ev.code == 'KeyZ') {
 				let r = this.textView.undo(ev.shiftKey);
 				if (r) {
 					this.caret.setPosition(r);
 				}
 			} else if (ev.code != 'Enter') {
-				let pos = this.textView.insert(this.caret.position, ev.key);
-				this.caret.setPosition(pos); // TODO: changed event
+				this.insertText(ev.key);
 			}
 		});
 
@@ -595,13 +636,18 @@ AFRAME.registerComponent('texteditor', {
 				}
 				this.textView.setSelection(range);
 			} else if (ev.code == 'Backspace') {
+				if (!data.editable) { return; }
 				let range = this.textView.selection || new TextRange(this.caret.position.withOffset(0, -1), this.caret.position);
 				this.caret.setPosition(this.textView.remove(range));
 			} else if (ev.code == 'Enter') {
-				this.caret.setPosition(this.textView.insert(this.caret.position, "\n"));
+				if (!data.editable) { return; }
+				this.insertText("\n");
 			}
 		});
 
+	},
+	insertText(s) {
+		this.caret.setPosition(this.textView.insert(this.caret.position, s));
 	},
 	update() {
 		let el = this.el, data = this.data;
