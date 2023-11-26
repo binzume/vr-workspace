@@ -263,13 +263,12 @@ AFRAME.registerComponent('calc3d', {
 			}
 		});
 		this._elByName('plot-button').addEventListener('click', ev => {
-			let meshGen = new MeshGen();
 			let src = inputEl.value;
 			let lines = src.split('\n');
 			let lastLine = lines[lines.length - 1];
 			meshGen.parseVarAssign(lastLine, vars);
 			updateVarList();
-			targetEl.setAttribute('calc3d-canvas', { src: varsArray.map(kv => kv.join('=')).join("\n") });
+			targetEl.setAttribute('calc3d-canvas', { src: varsArray.map(kv => kv.join('=')).join(';') });
 		});
 		this._elByName('mode-line').addEventListener('click', ev => {
 			targetEl.setAttribute('calc3d-canvas', { mode: 'line' });
