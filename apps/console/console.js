@@ -112,7 +112,7 @@
 	AFRAME.registerComponent('debug-log', {
 		schema: {
 			timestamp: { default: true },
-			lines: { default: 12 }
+			lines: { default: 20 }
 		},
 		log: [], // shared
 		orgLog: null,
