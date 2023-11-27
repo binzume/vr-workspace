@@ -69,9 +69,7 @@ class MultilineText {
 		this._canvas = document.createElement("canvas");
 		this._canvasCtx = this._canvas.getContext('2d');
 
-		this._texture = new THREE.CanvasTexture(this._canvas);
 		this.object3D = new THREE.Group();
-		this.textMaterial = new THREE.MeshBasicMaterial({ map: this._texture, transparent: true });
 		this._lineMeshes = [];
 		this._fontResolution = options.fontResolution || 32;
 		this._font = options.font || 'sans-serif';
@@ -85,20 +83,23 @@ class MultilineText {
 	 * @param {number} lineHeight 
 	 */
 	setSize(width, height, lineHeight) {
+		this.dispose();
+
 		this.width = width;
 		this.height = height;
 		this.lineHeight = lineHeight;
 		this.visibleLineCount = Math.ceil(height / lineHeight);
 
-		this._clearMesh();
 		let textureLines = this.visibleLineCount + 4;
 		this._textureLines = new Array(textureLines);
 		this._textureFreeLines = new Array(textureLines);
 		this._canvas.width = width * this._fontResolution / lineHeight;
 		this._canvas.height = this._fontResolution * textureLines;
-
 		this._canvasCtx.font = `${this._fontResolution * 0.9}px ${this._font}`;
 		this._canvasCtx.textBaseline = 'top';
+
+		this._texture = new THREE.CanvasTexture(this._canvas);
+		this.textMaterial = new THREE.MeshBasicMaterial({ map: this._texture, transparent: true });
 
 		for (let i = 0; i < textureLines; i++) {
 			let geom = new THREE.PlaneGeometry(width, lineHeight);
@@ -444,15 +445,15 @@ class MultilineText {
 	}
 
 	_clearMesh() {
+		this._lines.forEach(line => { this._hideLine(line); line.textureLine = null; });
 		this._lineMeshes.forEach(m => m.geometry.dispose());
 		this._lineMeshes = [];
 	}
 
 	dispose() {
-		this._lines = [];
 		this._clearMesh();
-		this._texture.dispose();
-		this.textMaterial.dispose();
+		this._texture && this._texture.dispose();
+		this.textMaterial && this.textMaterial.dispose();
 	}
 }
 
@@ -536,6 +537,13 @@ AFRAME.registerComponent('texteditor', {
 		});
 		el.classList.add('collidable');
 		el.setAttribute('tabindex', 0);
+		el.addEventListener('xyresize', ev => {
+			let rect = ev.detail.xyrect;
+			el.setAttribute('geometry', {
+				primitive: 'xy-rounded-rect', width: rect.width, height: rect.height
+			});
+			this.textView.setSize(rect.width, rect.height, this.textView.lineHeight);
+		});
 
 		let movepos = intersection => {
 			el.focus();
@@ -648,6 +656,9 @@ AFRAME.registerComponent('texteditor', {
 	},
 	insertText(s) {
 		this.caret.setPosition(this.textView.insert(this.caret.position, s));
+	},
+	selectAll() {
+		this.textView.setSelection(new TextRange(new TextPoint(0, 0), new TextPoint(9999, 9999)));
 	},
 	update() {
 		let el = this.el, data = this.data;

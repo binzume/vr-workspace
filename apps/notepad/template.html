@@ -13,10 +13,10 @@
 <body style="background-color: black; color:white;">
   <a-scene cursor="rayOrigin: mouse; fuse:false" raycaster="objects:.collidable">
 
-    <a-xywindow  id="app" notepad-app scale='0.2 0.2 0.2' title="Notepad" width="6" height="3.4" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:center">
-      <a-xycontainer width="6" height="0.4" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05">
-        <a-xyselect name="file-menu" label="File" width="0.5" height="0.4" values="New,Save"></a-xyselect>
-        <a-xyselect name="edit-menu" label="Edit" width="0.5" height="0.4" values="Copy,Cut,Paste,Undo,Redo"></a-xyselect>
+    <a-xywindow id="app" xyresize="minWidth:6" notepad-app scale='0.2 0.2 0.2' title="Notepad" width="6" height="3.4" position="0.5 0.5 -1" xywindow="background:true" xycontainer="direction:column;alignItems:stretch;justifyItems:stretch">
+      <a-xycontainer width="6" height="0.3" direction="row" align-items="stretch" justify-items="stretch" spacing="0.05" xyitem="grow:0;shrink:0">
+        <a-xyselect name="file-menu" label="File" width="0.5" values="New,Save"></a-xyselect>
+        <a-xyselect name="edit-menu" label="Edit" width="0.5" values="Copy,Cut,Paste,Undo,Redo"></a-xyselect>
         <a-xybutton name="pgup-button" label="PgUp" width="0.3"></a-xybutton>
         <a-xybutton name="pgdn-button" label="PgDn" width="0.3"></a-xybutton>
       </a-xycontainer>
