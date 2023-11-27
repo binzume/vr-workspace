@@ -22,43 +22,59 @@ TODO:
         let setMimeType = (type) => {
             editor.textView.styleLine = null;
             // TODO: more languages
+            let keywords = [];
+            let common = ['if', 'else', 'for', 'while', 'break', 'continue', 'switch', 'case', 'default',
+                'return', 'class', 'new', 'throw', 'try', 'catch', 'finally'];
             if (type.startsWith('text/javascript')) {
-                let keywords = ['for', 'if', 'else', 'while', 'switch', 'case', 'function', 'return', 'class', 'new', 'this', 'var', 'let', 'const',
-                    'null', 'true', 'false', 'undefined', 'undefined', 'instanceof', 'async', 'of', 'in'];
+                keywords = common.concat(['this', 'true', 'false', 'null', 'function', 'var', 'let', 'const',
+                    'undefined', 'NaN', 'instanceof', 'async', 'of', 'in', 'import', 'export', 'extends']);
+            } else if (type.startsWith('text/x-c')) {
+                keywords = common.concat(['char', 'int', 'short', 'long', 'float', 'double', 'static', 'struct', 'extern', 'this']);
+            } else if (type.startsWith('text/x-go')) {
+                keywords = ['break', 'default', 'func', 'interface', 'select', 'case', 'defer', 'go', 'map',
+                    'struct', 'chan', 'else', 'goto', 'package', 'switch', 'const', 'fallthrough', 'if', 'range',
+                    'type', 'continue', 'for', 'import', 'return', 'var'];
+            } else if (type.startsWith('text/x-java-source')) {
+                keywords = common;
+            }
+            if (keywords.length) {
                 editor.textView.styleLine = (line, setColor) => {
-                    for (let m of line.text.matchAll(/(\w+|"[^"]*"|'[^']*'|\/\/.*|[+\-*=!\/\[\]{}&|]+)/g)) {
+                    for (let m of line.text.matchAll(/(\d*\.\d+(?:e\d+)?|\w+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\/.*|[+\-*=!\/\[\]<>{}()&|%]+)/g)) {
                         if (keywords.includes(m[0])) {
-                            setColor(m.index, m.index + m[0].length, '#6666ff');
+                            setColor(m.index, m.index + m[0].length, '#2244ff');
                         } else if (m[0].match(/^['"`]/)) {
                             setColor(m.index, m.index + m[0].length, '#ff8822');
                         } else if (m[0].match(/^[0-9]/)) {
-                            setColor(m.index, m.index + m[0].length, '#ffff88');
-                        } else if (!m[0].match(/^\w/)) {
-                            setColor(m.index, m.index + m[0].length, '#ffff00');
+                            setColor(m.index, m.index + m[0].length, '#ff8822');
                         } else if (m[0].startsWith('//')) {
                             setColor(m.index, m.index + m[0].length, '#88ff88');
+                        } else if (!m[0].match(/^\w/)) {
+                            setColor(m.index, m.index + m[0].length, '#ffff00');
                         }
                     }
                 };
             }
         };
+        let save = async () => {
+            let content = new Blob([editorEl.value], { type: 'text/plain' });
+            if (this.file && this.file.update) {
+                console.log('save...');
+                await this.file.update(content);
+                console.log('saved');
+            } else if (this.appManager) {
+                let tmp = await this.appManager.newContent('text/plain', { extension: 'txt' });
+                await tmp.update(content);
+                console.log('saved', tmp.name);
+            }
+        };
 
-        this._elByName('file-menu').addEventListener('change', async (ev) => {
+        this._elByName('file-menu').addEventListener('change', (ev) => {
             if (ev.detail.index == 0) {
                 editorEl.value = '';
                 this.file = null;
                 setMimeType('text/plain');
             } else {
-                let content = new Blob([editorEl.value], { type: 'text/plain' });
-                if (this.file && this.file.update) {
-                    console.log('save...');
-                    await this.file.update(content);
-                    console.log('saved');
-                } else if (this.appManager) {
-                    let tmp = await this.appManager.newContent('text/plain', { extension: 'txt' });
-                    await tmp.update(content);
-                    console.log('saved', tmp.name);
-                }
+                save();
             }
         });
         this._elByName('pgup-button').addEventListener('click', (ev) => {
@@ -102,6 +118,18 @@ TODO:
                 editorEl.value = await res.text();
             }
         }, { once: true });
+
+
+        this.el.addEventListener('keydown', (ev) => {
+            if (ev.ctrlKey && ev.code == 'KeyA') {
+                editor.selectAll();
+                ev.preventDefault();
+            } else if (ev.ctrlKey && ev.code == 'KeyS') {
+                save();
+                ev.preventDefault();
+            }
+        });
+
     },
     _elByName(name) {
         return this.el.querySelector("[name=" + name + "]");
