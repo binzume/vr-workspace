@@ -20,6 +20,7 @@ TODO:
 `;
 
         let setMimeType = (type) => {
+            this.mimeType = type;
             editor.textView.styleLine = null;
             // TODO: more languages
             let keywords = [];
@@ -55,16 +56,16 @@ TODO:
                 };
             }
         };
-        let save = async () => {
-            let content = new Blob([editorEl.value], { type: 'text/plain' });
-            if (this.file && this.file.update) {
+        let save = async (saveas = false) => {
+            let type = this.mimeType || 'text/plain';
+            let content = new Blob([editorEl.value], { type: type });
+            if (this.file && this.file.update && !saveas) {
                 console.log('save...');
                 await this.file.update(content);
                 console.log('saved');
-            } else if (this.appManager) {
-                let tmp = await this.appManager.newContent('text/plain', { extension: 'txt' });
-                await tmp.update(content);
-                console.log('saved', tmp.name);
+            } else {
+                this.file = await this.saveFile(content, { extension: 'txt' });
+                console.log('saved', this.file.name);
             }
         };
 
@@ -73,8 +74,10 @@ TODO:
                 editorEl.value = '';
                 this.file = null;
                 setMimeType('text/plain');
-            } else {
+            } else if (ev.detail.index == 1) {
                 save();
+            } else if (ev.detail.index == 2) {
+                save(true);
             }
         });
         this._elByName('pgup-button').addEventListener('click', (ev) => {
@@ -109,7 +112,20 @@ TODO:
             this.file = ev.detail.content;
             if (this.file) {
                 this.el.setAttribute('title', `${this.file.name} - Notepad`);
-                setMimeType(this.file.type);
+                let mimeType = this.file.type.split(";")[0].trim();
+                if (!mimeType) {
+                    let ext = this.file.name.split('.').pop();
+                    if (ext == 'go') {
+                        mimeType = 'text/x-go';
+                    } else if (ext == 'c' || ext == 'cc' || ext == 'cpp' || ext == 'h') {
+                        mimeType = 'text/x-c';
+                    } else if (ext == 'js' || ext == 'json') {
+                        mimeType = 'text/javascript';
+                    } else {
+                        mimeType = 'text/plain';
+                    }
+                }
+                setMimeType(mimeType);
                 editorEl.value = 'Loading...';
                 let res = await (this.file.fetch ? this.file.fetch() : fetch(this.file.url));
                 if (this.file != ev.detail.content) {
@@ -130,6 +146,45 @@ TODO:
             }
         });
 
+    },
+    _appFolder() {
+        let app = this.el.components.vrapp;
+        if (app && app.context) {
+            return app.context.getDataFolder();
+        }
+        return null;
+    },
+    async saveFile(content, options = {}) {
+        function mkEl(tag, children, attrs) {
+            let el = document.createElement(tag);
+            children && el.append(...[children].flat(999));
+            attrs instanceof Function ? attrs(el) : (attrs && Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)));
+            return el;
+        }
+        let task = new Promise((resolve, reject) => {
+            let buttonEl = mkEl('a-xybutton', [], { label: 'Save' });
+            let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
+            let inputEl = mkEl('a-xyinput', [], { value: 'Untitled.' + (options.extension || 'txt') });
+            let el = mkEl('a-xycontainer', [
+                inputEl,
+                buttonEl,
+                cancelEl,
+            ], { position: '0 0 0.05', direction: 'row', xyitem: 'fixed: true' });
+            buttonEl.addEventListener('click', ev => {
+                this.el.removeChild(el);
+                resolve(inputEl.value);
+            });
+            cancelEl.addEventListener('click', ev => {
+                this.el.removeChild(el);
+                reject();
+            });
+            this.el.append(el);
+            setTimeout(() => inputEl.focus(), 0);
+        });
+        let name = await task;
+        console.log("Save", name);
+        let folder = this._appFolder();
+        return folder.writeFile(name, content, { mkdir: true });
     },
     _elByName(name) {
         return this.el.querySelector("[name=" + name + "]");
