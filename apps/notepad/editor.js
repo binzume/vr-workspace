@@ -37,9 +37,9 @@ class TextLine {
 	 */
 	constructor(text) {
 		this.text = text;
+		this.style = null;
 		this.visible = false;
 		this.textureLine = null;
-		this.width = 0;
 	}
 }
 
@@ -64,7 +64,6 @@ class MultilineText {
 		this._redoBuffer = [];
 
 		this._maxWidth = 0;
-		this._textureLines = [];
 		this._textureFreeLines = [];
 		this._canvas = document.createElement("canvas");
 		this._canvasCtx = this._canvas.getContext('2d');
@@ -74,7 +73,7 @@ class MultilineText {
 		this._fontResolution = options.fontResolution || 32;
 		this._font = options.font || 'sans-serif';
 
-		this.setSize(width, height, lineHeight);
+		this.setRenderSize(width, height, lineHeight);
 	}
 
 	/**
@@ -82,7 +81,7 @@ class MultilineText {
 	 * @param {number} height 
 	 * @param {number} lineHeight 
 	 */
-	setSize(width, height, lineHeight) {
+	setRenderSize(width, height, lineHeight) {
 		this.dispose();
 
 		this.width = width;
@@ -90,8 +89,7 @@ class MultilineText {
 		this.lineHeight = lineHeight;
 		this.visibleLineCount = Math.ceil(height / lineHeight);
 
-		let textureLines = this.visibleLineCount + 4;
-		this._textureLines = new Array(textureLines);
+		let textureLines = this.visibleLineCount + 1;
 		this._textureFreeLines = new Array(textureLines);
 		this._canvas.width = width * this._fontResolution / lineHeight;
 		this._canvas.height = this._fontResolution * textureLines;
@@ -118,6 +116,7 @@ class MultilineText {
 	 * @param {string} text 
 	 */
 	setText(text) {
+		this._setVisibleLines(0, 0);
 		this._lines = text.split("\n").map(text => new TextLine(text));
 		this._undoBuffer = [];
 		this._redoBuffer = [];
@@ -164,6 +163,7 @@ class MultilineText {
 		this._setLine(l, lastStr + t);
 
 		if (ll.length > 0) {
+			this._setVisibleLines(this.scrollY, this.visibleLineCount - ll.length);
 			this._lines.splice(l, 0, ...ll.map(text => new TextLine(text)));
 			this.refresh();
 		}
@@ -184,7 +184,7 @@ class MultilineText {
 		let t = this._lines[end.line].text.substring(end.column);
 		this._lines.splice(begin.line, end.line - begin.line).forEach(l => this._hideLine(l));
 		this._setLine(begin.line, h + t);
-		if (end.line - begin.line) {
+		if (end.line != begin.line) {
 			this.refresh();
 		}
 		return begin;
@@ -203,6 +203,19 @@ class MultilineText {
 		return null;
 	}
 
+	_setLine(l, text) {
+		let line = this._lines[l];
+		if (line == null || line.text == text) {
+			return;
+		}
+		line.text = text;
+		line.style = null;
+		if (line.visible) {
+			this._drawLine(line, l);
+		}
+		this.textChanged && this.textChanged();
+	}
+
 	_addHistory(op, undo) {
 		// TODO: merge one character operations.
 		let buffer = undo ? this._redoBuffer : this._undoBuffer;
@@ -213,6 +226,28 @@ class MultilineText {
 		if (buffer.length > this._undoLmit * 1.5) {
 			buffer.splice(0, buffer.length - this._undoLmit);
 		}
+	}
+
+	/**
+	 * @param {TextPoint} p
+	 * @param {boolean} moveLine 
+	 */
+	validatePosition(p, moveLine = true, d = false) {
+		if (moveLine && p.line > 0 && p.column < 0) {
+			p.line--;
+			p.column += this._lines[p.line].text.length + 1;
+		}
+		if (moveLine && p.line < this._lines.length - 1 && p.column > this._lines[p.line]?.text.length) {
+			p.column -= this._lines[p.line].text.length + 1;
+			p.line++;
+		}
+		p.line = Math.max(Math.min(p.line, this._lines.length - 1), 0);
+		let text = this._lines[p.line].text;
+		p.column = Math.max(Math.min(p.column, text.length), 0);
+		if (p.column && text[p.column] >= '\uDC00' && text[p.column] <= '\uDFFF') {
+			p.column += d ? 1 : -1;
+		}
+		return p;
 	}
 
 	/**
@@ -242,63 +277,14 @@ class MultilineText {
 		}
 	}
 
-	getPositionFromLocal(localPos) {
-		let l = Math.max(Math.min(Math.floor(-localPos.y / this.lineHeight), this._lines.length - 1), 0);
-		let c = this._getCol(this._lines[l].text, (localPos.x / this.width + 0.5) * this._canvas.width);
-		return new TextPoint(l, c);
-	}
-
-	getLocalPos(pos, destVec3) {
-		let s = this._lines[pos.line].text.slice(0, pos.column);
-		let x = (this._canvasCtx.measureText(s).width - this.scrollX)
-			* this.width / this._canvas.width - this.width / 2;
-		destVec3.set(x, this.lineHeight * (-pos.line - 0.5), 0);
-	}
-
-	refresh() {
-		this._textureLines.forEach(line => this._hideLine(line));
-
-		let end = Math.min(this.scrollY + this.visibleLineCount, this._lines.length);
-		for (let ln = this.scrollY; ln < end; ln++) {
-			let line = this._lines[ln];
-			this._showLine(line, ln);
-			let mesh = this._lineMeshes[line.textureLine];
-			mesh.position.set(0, this.lineHeight * (-ln - 0.5), 0);
-		}
-		this.object3D.position.set(0, this.lineHeight * this.scrollY + this.height / 2, 0.01);
-
-		this.onrefresh && this.onrefresh();
-	}
-
-	/**
-	 * @param {TextPoint} p
-	 * @param {boolean} moveLine 
-	 */
-	validatePosition(p, moveLine = true, d = false) {
-		if (moveLine && p.line > 0 && p.column < 0) {
-			p.line--;
-			p.column += this._lines[p.line].text.length + 1;
-		}
-		if (moveLine && p.line < this._lines.length - 1 && p.column > this._lines[p.line]?.text.length) {
-			p.column -= this._lines[p.line].text.length + 1;
-			p.line++;
-		}
-		p.line = Math.max(Math.min(p.line, this._lines.length - 1), 0);
-		let text = this._lines[p.line].text;
-		p.column = Math.max(Math.min(p.column, text.length), 0);
-		if (p.column && text[p.column] >= '\uDC00' && text[p.column] <= '\uDFFF') {
-			p.column += d ? 1 : -1;
-		}
-		return p;
-	}
-
 	scrollOffset(dx, dy) {
 		this.scrollX += dx;
-		this.scrollY += dy;
+		if (dy) {
+			this._setVisibleLines(this.scrollY + dy, this.visibleLineCount);
+			this.refresh();
+		}
 		if (dx) {
 			this._redraw();
-		} else if (dy) {
-			this.refresh();
 		}
 	}
 
@@ -320,6 +306,43 @@ class MultilineText {
 		}
 	}
 
+	getPositionFromLocal(localPos) {
+		let l = Math.max(Math.min(Math.floor(-localPos.y / this.lineHeight), this._lines.length - 1), 0);
+		let c = this._getCol(this._lines[l].text, (localPos.x / this.width + 0.5) * this._canvas.width);
+		return new TextPoint(l, c);
+	}
+
+	getLocalPos(pos, destVec3) {
+		let s = this._lines[pos.line].text.slice(0, pos.column);
+		let x = (this._canvasCtx.measureText(s).width - this.scrollX)
+			* this.width / this._canvas.width - this.width / 2;
+		destVec3.set(x, this.lineHeight * (-pos.line - 0.5), 0);
+	}
+
+	refresh() {
+		let end = Math.min(this.scrollY + this.visibleLineCount, this._lines.length);
+		for (let ln = this.scrollY; ln < end; ln++) {
+			let line = this._lines[ln];
+			this._showLine(line, ln);
+			let mesh = this._lineMeshes[line.textureLine];
+			mesh.position.set(0, this.lineHeight * (-ln - 0.5), 0);
+		}
+		this.object3D.position.set(0, this.lineHeight * this.scrollY + this.height / 2, 0.01);
+		this.onrefresh && this.onrefresh();
+	}
+
+	_setVisibleLines(start, count) {
+		let b = Math.min(start, this.scrollY + this.visibleLineCount);
+		for (let i = this.scrollY; i < b; i++) {
+			this._hideLine(this._lines[i]);
+		}
+		let t = Math.max(start + count, this.scrollY);
+		for (let i = t; i < this.scrollY + this.visibleLineCount; i++) {
+			this._hideLine(this._lines[i]);
+		}
+		this.scrollY = start;
+	}
+
 	_redraw() {
 		let end = Math.min(this.scrollY + this.visibleLineCount, this._lines.length);
 		for (let ln = this.scrollY; ln < end; ln++) {
@@ -330,45 +353,31 @@ class MultilineText {
 		}
 	}
 
-	_setLine(l, text) {
-		let line = this._lines[l];
-		if (line == null || line.text == text) {
-			return;
-		}
-		line.text = text;
-		if (line.visible) {
-			this._drawLine(line, l);
-		}
-		this.textChanged && this.textChanged();
-	}
-
 	_showLine(line, l) {
-		if (line == null || line.visible) {
+		if (line.visible) {
 			return;
 		}
-		if (line.textureLine === null) {
-			this._bindTextureLine(line);
-			this._drawLine(line, l);
-		} else {
-			this._textureFreeLines = this._textureFreeLines.filter(l => l != line.textureLine);
+		if (line.textureLine == null) {
+			line.textureLine = this._textureFreeLines.shift();
 		}
+		this._drawLine(line, l);
 
 		this.object3D.add(this._lineMeshes[line.textureLine]);
 		line.visible = true;
 	}
 
 	_hideLine(line) {
-		if (line == null || !line.visible) {
-			return;
-		}
-		this.object3D.remove(this._lineMeshes[line.textureLine]);
-		this._textureFreeLines.push(line.textureLine);
+		if (line == null) { return; }
 		line.visible = false;
+		if (line.textureLine != null) {
+			this.object3D.remove(this._lineMeshes[line.textureLine]);
+			this._textureFreeLines.push(line.textureLine);
+			line.textureLine = null;
+		}
 	}
 
 	_drawLine(line, l) {
-		let fragments = [[0, line.text.length, 'white', null]];
-		let selection = this.selection;
+		let fragments = line.style ||= [[0, line.text.length, 'white', null]];
 		let setColor = (s, e, fg, bg) => {
 			for (let i = 0; i < fragments.length; i++) {
 				let f = fragments[i], fs = f[0], fe = f[1];
@@ -386,14 +395,16 @@ class MultilineText {
 				}
 			}
 		};
+		let selection = this.selection;
 		this.styleLine && this.styleLine(line, setColor, l);
 		if (selection && l >= selection.min().line && l <= selection.max().line) {
 			let min = selection.min(), max = selection.max();
 			let s = min.line == l ? min.column : 0;
 			let e = max.line == l ? max.column : line.text.length;
+			fragments = fragments.slice();
 			setColor(s, e, 'yellow', 'blue');
 		}
-		line.width = this._drawLineFragments(line, fragments);
+		this._drawLineFragments(line, fragments);
 	}
 
 	_drawLineFragments(line, fragments) {
@@ -417,15 +428,6 @@ class MultilineText {
 		return width;
 	}
 
-	_bindTextureLine(line) {
-		let l = this._textureFreeLines.shift();
-		if (this._textureLines[l]) {
-			this._textureLines[l].textureLine = null;
-		}
-		this._textureLines[l] = line;
-		line.textureLine = l;
-	}
-
 	_getCol(str, x) {
 		let _caretpos = (p) => {
 			let s = str.slice(0, p);
@@ -444,14 +446,10 @@ class MultilineText {
 		return min;
 	}
 
-	_clearMesh() {
-		this._lines.forEach(line => { this._hideLine(line); line.textureLine = null; });
+	dispose() {
+		this._setVisibleLines(0, 0);
 		this._lineMeshes.forEach(m => m.geometry.dispose());
 		this._lineMeshes = [];
-	}
-
-	dispose() {
-		this._clearMesh();
 		this._texture && this._texture.dispose();
 		this.textMaterial && this.textMaterial.dispose();
 	}
@@ -542,7 +540,7 @@ AFRAME.registerComponent('texteditor', {
 			el.setAttribute('geometry', {
 				primitive: 'xy-rounded-rect', width: rect.width, height: rect.height
 			});
-			this.textView.setSize(rect.width, rect.height, this.textView.lineHeight);
+			this.textView.setRenderSize(rect.width, rect.height, this.textView.lineHeight);
 		});
 
 		let movepos = intersection => {
