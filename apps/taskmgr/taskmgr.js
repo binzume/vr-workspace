@@ -19,29 +19,13 @@ AFRAME.registerComponent('task-manager', {
 	remove() {
 		clearInterval(this._updateTimer);
 	},
-	_appFolder() {
-		let app = this.el.components.vrapp;
-		if (app && app.context) {
-			return app.context.getDataFolder();
-		}
-		return null;
-	},
 	async _saveJson(name, data) {
 		let json = JSON.stringify(data);
-		let folder = this._appFolder();
-		if (!folder || !folder.writeFile) {
-			localStorage.setItem('taskmgr-' + name,json);
-			return;
-		}
-		await folder.writeFile(name + '.session.json', new Blob([json], {type: 'application/json'}), {mkdir: true});
+		let content = new Blob([json], { type: 'application/json' });
+		await this.el.components.vrapp.saveFile(content, { defaultName: name + '.session.json', extension: 'session.json' });
 	},
 	async _loadJson(name) {
-		let folder = this._appFolder();
-		if (!folder || !folder.writeFile) {
-			let json = localStorage.getItem('taskmgr-' + name);
-			return json ? JSON.parse(json) : null;
-		}
-		let file = await folder.getFile(name + '.session.json');
+		let file = await this.el.components.vrapp.selectFile({ defaultName: name + '.session.json', extension: 'session.json' });
 		return await (await file.fetch()).json();
 	},
 	_initRunningAppList() {

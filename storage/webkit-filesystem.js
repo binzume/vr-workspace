@@ -101,12 +101,13 @@ class FileSystemWrapper {
         let writer = await handle.createWritable({ keepExistingData: options.keepExistingData });
         await writer.write(content);
         await writer.close();
+        return await this.statInternal(handle);
     }
 
     async getFile(path, options = {}) {
         let handle = await this.resolvePath(path, 'file', options.create);
         return await this.statInternal(handle);
-   }
+    }
 
     /**
      * @param {string} path
@@ -302,6 +303,7 @@ export class WebkitFileSystemWrapper {
         let writer = await new Promise((resolve, reject) => file.createWriter(resolve, reject));
         await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.truncate(0); });
         await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.write(content); });
+        return await this.statInternal(file);
     }
     async statInternal(entry) {
         let file = entry.isFile ? (await new Promise((resolve, reject) => entry.file(resolve, reject))) : null;
@@ -336,7 +338,7 @@ class WebkitFileSystemWrapperFileList {
         let path = (this._path ? this._path + '/' : '') + f.name;
         f.path = this._pathPrefix + path;
         f.url = f._file && URL.createObjectURL(f._file);
-        f.remove || (f.remove = () => this._storage.remove(path, {recursive: true}));
+        f.remove || (f.remove = () => this._storage.remove(path, { recursive: true }));
         if (f._handle && f._handle.move) {
             f.rename = async (name) => f._handle.move(name);
         }
@@ -347,10 +349,10 @@ class WebkitFileSystemWrapperFileList {
             return this;
         };
         if (f.metadata && f.metadata.thumbnail) {
-            f.thumbnail = {fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999))};
+            f.thumbnail = { fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999)) };
         }
         if (f._file) {
-            f.fetch = async(start, end) => {
+            f.fetch = async (start, end) => {
                 return new Response(start != null ? f._file.slice(start, end) : f._file);
             };
         }
@@ -396,8 +398,8 @@ class WebkitFileSystemWrapperFileList {
         return this._storage.mkdir(this._path + '/' + name);
     }
 
-    writeFile(name, blob, options = {}) {
-        return this._storage.writeFile(this._path + '/' + name, blob, options);
+    async writeFile(name, blob, options = {}) {
+        return this._procFile(await this._storage.writeFile(this._path + '/' + name, blob, options));
     }
 
     async getFile(name, options = {}) {

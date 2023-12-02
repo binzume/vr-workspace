@@ -61,7 +61,7 @@ declare global {
 
     interface AppStartEventData {
         app: AppInfo;
-        services: { appManager: AppManager, storage?: FolderResolver&Folder, [key: string]: any };
+        services: { appManager: AppManager, storage?: FolderResolver & Folder, [key: string]: any };
         appManager: AppManager;
         args: any;
         content: any;
@@ -97,10 +97,10 @@ declare global {
 
     interface Folder {
         getInfo?(): Promise<{ name: string, [k: string], any }>;
-        getFiles(offset: any, limit: number, options: object, signal: AbortSignal): Promise<FilesResult>;
-        getFile(name: string, options: any): Promise<FileInfo>;
-        writeFile?(name: string, content: Blob): Promise<any>;
-        mkdir(name: string): string;
+        getFiles(offset?: any, limit?: number, options?: object, signal?: AbortSignal): Promise<FilesResult>;
+        getFile(name: string, options?: any): Promise<FileInfo>;
+        writeFile?(name: string, content: Blob, options?: any): Promise<any>;
+        mkdir?(name: string): string;
         getParentPath(): string;
         onupdate?: () => any;
         path?: string;
@@ -111,6 +111,12 @@ declare global {
     interface FolderResolver {
         getFolder(path: string, prefix?: string): Folder;
         parsePath(path: string): string[][];
+    }
+
+    interface VRAppComponent {
+        context: AppStartEventData;
+        app: AppInfo;
+        saveFile(content: Blob, options?: any): Promise<FileInfo>;
     }
 
     var storageList: FolderResolver & Folder & { addStorage: any, removeStorage: any };

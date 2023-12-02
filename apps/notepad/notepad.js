@@ -70,7 +70,7 @@ TODO:
                 await this.file.update(content);
                 console.log('saved');
             } else {
-                this.file = await this.saveFile(content, { extension: 'txt' });
+                this.file = await this.el.components.vrapp.saveFile(content, { extension: 'txt' });
                 console.log('saved', this.file.name);
             }
         };
@@ -154,89 +154,6 @@ TODO:
                 ev.preventDefault();
             }
         });
-
-    },
-    _appFolder() {
-        let app = this.el.components.vrapp;
-        if (app && app.context) {
-            return app.context.getDataFolder();
-        }
-        return null;
-    },
-    async saveFile(content, options = {}) {
-        function mkEl(tag, children, attrs) {
-            let el = document.createElement(tag);
-            children && el.append(...[children].flat(999));
-            attrs instanceof Function ? attrs(el) : (attrs && Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)));
-            return el;
-        }
-        /** @type {Folder} */
-        let folder = this._appFolder();
-        let task = new Promise(async (resolve, reject) => {
-            let buttonEl = mkEl('a-xybutton', [], { label: 'Save' });
-            let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
-            let inputEl = mkEl('a-xyinput', [], { value: 'Untitled.' + (options.extension || 'txt'), width: 3 });
-            let selectFolderEl = mkEl('a-xyselect', [], { values: '' });
-            // TODO: tree view
-            let roots = [
-                [this._appFolder(), this.el.components.vrapp.app.name],
-                [this.el.components.vrapp.services.storage, '/']
-            ];
-            let path = [];
-            let folders = [];
-            let selectFolder = async (fi) => {
-                folder = fi[0];
-                if (roots.includes(fi)) {
-                    path = [fi];
-                } else if (path.includes(fi)) {
-                    path = path.slice(0, path.indexOf(fi) + 1);
-                } else {
-                    path.push(fi);
-                }
-                let ff = path.slice();
-                for (let f of (await folder.getFiles(0, 1000)).items) {
-                    if (f.type == 'folder') {
-                        ff.push([this.el.components.vrapp.services.storage.getFolder(f.path), f.name]);
-                    }
-                }
-                folders = roots.slice();
-                folders.splice(roots.indexOf(ff[0]), 1, ...ff);
-                selectFolderEl.setAttribute('values', folders.map(fi => fi[1]).join(','));
-                return folders.indexOf(fi);
-            };
-            selectFolder(roots[0]);
-            let el = mkEl('a-xycontainer', [
-                mkEl('a-entity', [], {
-                    xyitem: 'fixed: true',
-                    geometry: 'primitive: xy-rounded-rect; width: 4; height: 2.5',
-                    material: 'color: #000000',
-                    position: '0 0 -0.1',
-                }),
-                mkEl('a-xycontainer', [
-                    mkEl('a-xylabel', ['Folder:'], { value: 'Folder:', width: 1.5, height: 0.4 }),
-                    selectFolderEl,
-                ], { direction: 'row' }),
-                inputEl,
-                mkEl('a-xycontainer', [buttonEl, cancelEl], { direction: 'row' }),
-            ], {
-                position: '0 0 0.2', direction: 'column', xyitem: 'fixed: true',
-            });
-            buttonEl.addEventListener('click', ev => {
-                this.el.removeChild(el);
-                resolve(inputEl.value);
-            });
-            cancelEl.addEventListener('click', ev => {
-                this.el.removeChild(el);
-                reject();
-            });
-            selectFolderEl.addEventListener('change', async (ev) => {
-                selectFolderEl.setAttribute('select', await selectFolder(folders[ev.detail.index]));
-            });
-            this.el.append(el);
-            setTimeout(() => inputEl.focus(), 0);
-        });
-        let name = await task;
-        return await folder.writeFile(name, content, { mkdir: true });
     },
     _elByName(name) {
         return this.el.querySelector("[name=" + name + "]");

@@ -28,8 +28,10 @@ class AppManager {
 				let contentTypes = el.dataset.contentType?.split(',') ?? [];
 				let contentNameSuffix = el.dataset.contentNameSuffix?.split(',') ?? [];
 				let hidden = el.classList.contains('hidden');
-				let app = { id: el.id, name: el.innerText.trim(), type: type, url: el.getAttribute('href'),
-					hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes, contentNameSuffix: contentNameSuffix };
+				let app = {
+					id: el.id, name: el.innerText.trim(), type: type, url: el.getAttribute('href'),
+					hidden: hidden, wid: el.dataset.wid, contentTypes: contentTypes, contentNameSuffix: contentNameSuffix
+				};
 				apps.push(app);
 			}
 		}
@@ -340,7 +342,7 @@ class AppManager {
 
 globalThis.appManager = new AppManager();
 
-AFRAME.registerComponent('vrapp', {
+AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 	init() {
 		/** @type {AppManager} */
 		this.services = {};
@@ -355,6 +357,199 @@ AFRAME.registerComponent('vrapp', {
 			this.app = ev.detail.app;
 			this.args = ev.detail.args;
 		}, { once: true });
+	},
+	/**
+	 * @param {Blob} content 
+	 * @param {{extension?: string, defaultName?: string, [key:string]:any}} options 
+	 * @returns {Promise<FileInfo>}
+	 */
+	async saveFile(content, options = {}) {
+		function mkEl(tag, children, attrs) {
+			let el = document.createElement(tag);
+			children && el.append(...[children].flat(999));
+			attrs instanceof Function ? attrs(el) : (attrs && Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)));
+			return el;
+		}
+		/** @type {Folder} */
+		let folder = this.context.getDataFolder();
+		let name = await new Promise((resolve, reject) => {
+			let defname = options.defaultName || 'Untitled.' + (options.extension || 'txt');
+			let okEl = mkEl('a-xybutton', [], { label: 'Save' });
+			let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
+			let inputEl = mkEl('a-xyinput', [], { value: defname, width: 3 });
+			// TODO: tree view
+			let selectFolderEl = mkEl('a-xyselect', [], { values: '' });
+			let roots = [
+				options.folder ? [options.folder, options.folder.name] :
+					[this.context.getDataFolder(), this.context.app.name]
+			];
+			if (this.context.services.storage) {
+				roots.push([this.context.services.storage, '/']);
+			}
+			let path = [];
+			let folders = [];
+			let selectFolder = async (fi) => {
+				folder = fi[0];
+				if (roots.includes(fi)) {
+					path = [fi];
+				} else if (path.includes(fi)) {
+					path = path.slice(0, path.indexOf(fi) + 1);
+				} else {
+					path.push(fi);
+				}
+				let ff = path.slice();
+				for (let f of (await folder.getFiles(0, 1000)).items) {
+					if (f.type == 'folder') {
+						ff.push([this.context.services.storage.getFolder(f.path), f.name]);
+					}
+				}
+				folders = roots.slice();
+				folders.splice(roots.indexOf(ff[0]), 1, ...ff);
+				selectFolderEl.setAttribute('values', folders.map(fi => fi[1]).join(','));
+				return folders.indexOf(fi);
+			};
+			selectFolderEl.addEventListener('change', async (ev) => {
+				selectFolderEl.setAttribute('select', await selectFolder(folders[ev.detail.index]));
+			});
+			selectFolder(roots[0]);
+			let el = mkEl('a-xycontainer', [
+				mkEl('a-entity', [], {
+					xyitem: 'fixed: true',
+					geometry: 'primitive: xy-rounded-rect; width: 4; height: 2.5',
+					material: 'color: #000000',
+					position: '0 0 -0.1',
+				}),
+				mkEl('a-xycontainer', [
+					mkEl('a-xylabel', ['Folder:'], { value: 'Folder:', width: 1.5, height: 0.4 }),
+					selectFolderEl,
+				], { direction: 'row' }),
+				inputEl,
+				mkEl('a-xycontainer', [okEl, cancelEl], { direction: 'row' }),
+			], {
+				position: '0 0 0.2', direction: 'column', xyitem: 'fixed: true',
+			});
+			let cancelEvent = ev => !ev.composedPath().includes(el) && ev.stopPropagation();
+			this.el.addEventListener('click', cancelEvent, true);
+			this.el.addEventListener('focus', cancelEvent, true);
+			this.el.addEventListener('keypress', cancelEvent, true);
+			this.el.addEventListener('keydown', cancelEvent, true);
+			let close = () => {
+				this.el.removeChild(el);
+				this.el.removeEventListener('click', cancelEvent, true);
+				this.el.removeEventListener('focus', cancelEvent, true);
+				this.el.removeEventListener('keypress', cancelEvent, true);
+				this.el.removeEventListener('keydown', cancelEvent, true);
+			};
+			okEl.addEventListener('click', ev => {
+				close();
+				resolve(inputEl.value);
+			});
+			cancelEl.addEventListener('click', ev => {
+				close();
+				reject();
+			});
+			this.el.append(el);
+			setTimeout(() => inputEl.focus(), 0);
+		});
+		return await folder.writeFile(name, content, { mkdir: true });
+	},
+	/**
+	 * @param {{extension?: string, folder?: Folder, [key:string]:any}} options 
+	 * @returns {Promise<FileInfo>}
+	 */
+	async selectFile(options = {}) {
+		function mkEl(tag, children, attrs) {
+			let el = document.createElement(tag);
+			children && el.append(...[children].flat(999));
+			attrs instanceof Function ? attrs(el) : (attrs && Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)));
+			return el;
+		}
+		return await new Promise(async (resolve, reject) => {
+			/** @type {Folder} */
+			let folder = options.folder || this.context.getDataFolder();
+			let okEl = mkEl('a-xybutton', [], { label: 'Open' });
+			let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
+			let selectFileEl = mkEl('a-xyselect', [], { values: '' });
+			// TODO: tree view
+			let selectFolderEl = mkEl('a-xyselect', [], { values: '' });
+			let roots = [
+				options.folder ? [options.folder, options.folder.name] :
+					[this.context.getDataFolder(), this.context.app.name]
+			];
+			if (this.context.services.storage) {
+				roots.push([this.context.services.storage, '/']);
+			}
+			let path = [];
+			let folders = [];
+			let files = [];
+			let selectFolder = async (fi) => {
+				folder = fi[0];
+				if (roots.includes(fi)) {
+					path = [fi];
+				} else if (path.includes(fi)) {
+					path = path.slice(0, path.indexOf(fi) + 1);
+				} else {
+					path.push(fi);
+				}
+				let ff = path.slice();
+				let items = (await folder.getFiles(0, 1000)).items;
+				ff.push(...items.filter(f => f.type == 'folder').map(f => [this.context.services.storage.getFolder(f.path), f.name]));
+				folders = roots.slice();
+				folders.splice(roots.indexOf(ff[0]), 1, ...ff);
+				selectFolderEl.setAttribute('values', folders.map(fi => fi[1]).join(','));
+
+				files = items.filter(f => f.type != 'folder');
+				if (options.extension) {
+					files = files.filter(f => f.name.endsWith('.' + options.extension));
+				}
+				selectFileEl.setAttribute('values', files.map(f => f.name).join(','));
+
+				return folders.indexOf(fi);
+			};
+			selectFolderEl.addEventListener('change', async (ev) => {
+				selectFolderEl.setAttribute('select', await selectFolder(folders[ev.detail.index]));
+			});
+			selectFolder(roots[0]);
+
+			let el = mkEl('a-xycontainer', [
+				mkEl('a-entity', [], {
+					xyitem: 'fixed: true',
+					geometry: 'primitive: xy-rounded-rect; width: 4; height: 2.5',
+					material: 'color: #000000',
+					position: '0 0 -0.1',
+				}),
+				mkEl('a-xycontainer', [
+					mkEl('a-xylabel', ['Folder:'], { value: 'Folder:', width: 1.5, height: 0.4 }),
+					selectFolderEl,
+				], { direction: 'row' }),
+				selectFileEl,
+				mkEl('a-xycontainer', [okEl, cancelEl], { direction: 'row' }),
+			], {
+				position: '0 0 0.2', direction: 'column', xyitem: 'fixed: true',
+			});
+			let cancelEvent = ev => !ev.composedPath().includes(el) && ev.stopPropagation();
+			this.el.addEventListener('click', cancelEvent, true);
+			this.el.addEventListener('focus', cancelEvent, true);
+			this.el.addEventListener('keypress', cancelEvent, true);
+			this.el.addEventListener('keydown', cancelEvent, true);
+			let close = () => {
+				this.el.removeChild(el);
+				this.el.removeEventListener('click', cancelEvent, true);
+				this.el.removeEventListener('focus', cancelEvent, true);
+				this.el.removeEventListener('keypress', cancelEvent, true);
+				this.el.removeEventListener('keydown', cancelEvent, true);
+			};
+			okEl.addEventListener('click', ev => {
+				close();
+				resolve(files[selectFileEl.getAttribute('select') || 0]);
+			});
+			cancelEl.addEventListener('click', ev => {
+				close();
+				reject();
+			});
+			this.el.append(el);
+			setTimeout(() => selectFileEl.focus(), 0);
+		});
 	}
 });
 
