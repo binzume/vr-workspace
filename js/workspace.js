@@ -364,100 +364,20 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 	 * @returns {Promise<FileInfo>}
 	 */
 	async saveFile(content, options = {}) {
-		function mkEl(tag, children, attrs) {
-			let el = document.createElement(tag);
-			children && el.append(...[children].flat(999));
-			attrs instanceof Function ? attrs(el) : (attrs && Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)));
-			return el;
+		let result = await this._selectFileInternal(options, true);
+		if (result.file) {
+			console.log('WARN: file already exists: ' + result.file.name);
 		}
-		/** @type {Folder} */
-		let folder = this.context.getDataFolder();
-		let name = await new Promise((resolve, reject) => {
-			let defname = options.defaultName || 'Untitled.' + (options.extension || 'txt');
-			let okEl = mkEl('a-xybutton', [], { label: 'Save' });
-			let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
-			let inputEl = mkEl('a-xyinput', [], { value: defname, width: 3 });
-			// TODO: tree view
-			let selectFolderEl = mkEl('a-xyselect', [], { values: '' });
-			let roots = [
-				options.folder ? [options.folder, options.folder.name] :
-					[this.context.getDataFolder(), this.context.app.name]
-			];
-			if (this.context.services.storage) {
-				roots.push([this.context.services.storage, '/']);
-			}
-			let path = [];
-			let folders = [];
-			let selectFolder = async (fi) => {
-				folder = fi[0];
-				if (roots.includes(fi)) {
-					path = [fi];
-				} else if (path.includes(fi)) {
-					path = path.slice(0, path.indexOf(fi) + 1);
-				} else {
-					path.push(fi);
-				}
-				let ff = path.slice();
-				for (let f of (await folder.getFiles(0, 1000)).items) {
-					if (f.type == 'folder') {
-						ff.push([this.context.services.storage.getFolder(f.path), f.name]);
-					}
-				}
-				folders = roots.slice();
-				folders.splice(roots.indexOf(ff[0]), 1, ...ff);
-				selectFolderEl.setAttribute('values', folders.map(fi => fi[1]).join(','));
-				return folders.indexOf(fi);
-			};
-			selectFolderEl.addEventListener('change', async (ev) => {
-				selectFolderEl.setAttribute('select', await selectFolder(folders[ev.detail.index]));
-			});
-			selectFolder(roots[0]);
-			let el = mkEl('a-xycontainer', [
-				mkEl('a-entity', [], {
-					xyitem: 'fixed: true',
-					geometry: 'primitive: xy-rounded-rect; width: 4; height: 2.5',
-					material: 'color: #000000',
-					position: '0 0 -0.1',
-				}),
-				mkEl('a-xycontainer', [
-					mkEl('a-xylabel', ['Folder:'], { value: 'Folder:', width: 1.5, height: 0.4 }),
-					selectFolderEl,
-				], { direction: 'row' }),
-				inputEl,
-				mkEl('a-xycontainer', [okEl, cancelEl], { direction: 'row' }),
-			], {
-				position: '0 0 0.2', direction: 'column', xyitem: 'fixed: true',
-			});
-			let cancelEvent = ev => !ev.composedPath().includes(el) && ev.stopPropagation();
-			this.el.addEventListener('click', cancelEvent, true);
-			this.el.addEventListener('focus', cancelEvent, true);
-			this.el.addEventListener('keypress', cancelEvent, true);
-			this.el.addEventListener('keydown', cancelEvent, true);
-			let close = () => {
-				this.el.removeChild(el);
-				this.el.removeEventListener('click', cancelEvent, true);
-				this.el.removeEventListener('focus', cancelEvent, true);
-				this.el.removeEventListener('keypress', cancelEvent, true);
-				this.el.removeEventListener('keydown', cancelEvent, true);
-			};
-			okEl.addEventListener('click', ev => {
-				close();
-				resolve(inputEl.value);
-			});
-			cancelEl.addEventListener('click', ev => {
-				close();
-				reject();
-			});
-			this.el.append(el);
-			setTimeout(() => inputEl.focus(), 0);
-		});
-		return await folder.writeFile(name, content, { mkdir: true });
+		return await result.folder.writeFile(result.fileName, content, { mkdir: true });
 	},
 	/**
 	 * @param {{extension?: string, folder?: Folder, [key:string]:any}} options 
 	 * @returns {Promise<FileInfo>}
 	 */
 	async selectFile(options = {}) {
+		return (await this._selectFileInternal(options, false)).file;
+	},
+	async _selectFileInternal(options, create) {
 		function mkEl(tag, children, attrs) {
 			let el = document.createElement(tag);
 			children && el.append(...[children].flat(999));
@@ -467,17 +387,25 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 		return await new Promise(async (resolve, reject) => {
 			/** @type {Folder} */
 			let folder = options.folder || this.context.getDataFolder();
-			let okEl = mkEl('a-xybutton', [], { label: 'Open' });
+			let okEl = mkEl('a-xybutton', [], { label: create ? 'Save' : 'Open' });
 			let cancelEl = mkEl('a-xybutton', [], { label: 'Cancel' });
-			let selectFileEl = mkEl('a-xyselect', [], { values: '' });
+			let selectFileEl, fileNameEl;
+			if (create) {
+				let defname = options.defaultName || 'Untitled.' + (options.extension || 'txt');
+				fileNameEl = mkEl('a-xyinput', [], { value: defname, width: 3 });
+			} else {
+				selectFileEl = mkEl('a-xyselect', [], { values: '' });
+			}
+
 			// TODO: tree view
 			let selectFolderEl = mkEl('a-xyselect', [], { values: '' });
 			let roots = [
 				options.folder ? [options.folder, options.folder.name] :
 					[this.context.getDataFolder(), this.context.app.name]
 			];
-			if (this.context.services.storage) {
-				roots.push([this.context.services.storage, '/']);
+			let storageService = this.context.services.storage;
+			if (storageService) {
+				roots.push([storageService, 'Storage']);
 			}
 			let path = [];
 			let folders = [];
@@ -493,7 +421,9 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 				}
 				let ff = path.slice();
 				let items = (await folder.getFiles(0, 1000)).items;
-				ff.push(...items.filter(f => f.type == 'folder').map(f => [this.context.services.storage.getFolder(f.path), f.name]));
+				if (storageService) {
+					ff.push(...items.filter(f => f.type == 'folder').map(f => [storageService.getFolder(f.path), f.name]));
+				}
 				folders = roots.slice();
 				folders.splice(roots.indexOf(ff[0]), 1, ...ff);
 				selectFolderEl.setAttribute('values', folders.map(fi => fi[1]).join(','));
@@ -502,8 +432,9 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 				if (options.extension) {
 					files = files.filter(f => f.name.endsWith('.' + options.extension));
 				}
-				selectFileEl.setAttribute('values', files.map(f => f.name).join(','));
-
+				if (selectFileEl) {
+					selectFileEl.setAttribute('values', files.map(f => f.name).join(','));
+				}
 				return folders.indexOf(fi);
 			};
 			selectFolderEl.addEventListener('change', async (ev) => {
@@ -522,7 +453,7 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 					mkEl('a-xylabel', ['Folder:'], { value: 'Folder:', width: 1.5, height: 0.4 }),
 					selectFolderEl,
 				], { direction: 'row' }),
-				selectFileEl,
+				selectFileEl || fileNameEl,
 				mkEl('a-xycontainer', [okEl, cancelEl], { direction: 'row' }),
 			], {
 				position: '0 0 0.2', direction: 'column', xyitem: 'fixed: true',
@@ -541,14 +472,19 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 			};
 			okEl.addEventListener('click', ev => {
 				close();
-				resolve(files[selectFileEl.getAttribute('select') || 0]);
+				let file = selectFileEl ? files[selectFileEl.getAttribute('select') || 0] : files.find(f => f.name == fileNameEl.value)
+				resolve({
+					folder: folder,
+					file: file,
+					fileName: fileNameEl ? fileNameEl.value : (file && file.name),
+				});
 			});
 			cancelEl.addEventListener('click', ev => {
 				close();
 				reject();
 			});
 			this.el.append(el);
-			setTimeout(() => selectFileEl.focus(), 0);
+			setTimeout(() => (fileNameEl || selectFileEl).focus(), 0);
 		});
 	}
 });
