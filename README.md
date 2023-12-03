@@ -1,6 +1,6 @@
-# WebVR Workspace
+# VR Workspace
 
-WebVR/WebXRで色々試すための環境です．
+ブラウザのWebVR/WebXRで動作するXR Workspace環境です。
 
 ## Demo
 
@@ -13,7 +13,7 @@ OculusQuest等で上記URLにアクセスして `VR` または `AR` ボタンを
 - Google Drive上のファイルを使いたい場合は事前に `Storage Settings` 内でアクセスを許可してください
 
 サーバ等は不要ですが，WebXR Device APIを使うためには適当なHTTPサーバを用いて https:// でアクセスする必要があります。
-また、別の環境で動かしたい場合は Google API の clientId等は書き換えてください．
+また、別の環境にアップロードして利用する場合は Google API の clientId等を書き換えてください．
 
 ## Features
 
@@ -22,6 +22,8 @@ OculusQuest等で上記URLにアクセスして `VR` または `AR` ボタンを
 - VR app dynamic loading 
 
 ## Available apps
+
+アプリケーションの実装方法は [docs/application.md](docs/application.md) を参照してください。
 
 - Calculator
 - Notepad
