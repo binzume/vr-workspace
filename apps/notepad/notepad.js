@@ -74,16 +74,44 @@ TODO:
                 console.log('saved', this.file.name);
             }
         };
-
+        let load = async (file) => {
+            this.file = file;
+            if (file) {
+                this.el.setAttribute('title', `${this.file.name} - Notepad`);
+                let mimeType = this.file.type.split(";")[0].trim();
+                if (!mimeType) {
+                    let ext = this.file.name.split('.').pop();
+                    if (ext == 'go') {
+                        mimeType = 'text/x-go';
+                    } else if (ext == 'c' || ext == 'cc' || ext == 'cpp' || ext == 'h') {
+                        mimeType = 'text/x-c';
+                    } else if (ext == 'js' || ext == 'json') {
+                        mimeType = 'text/javascript';
+                    } else {
+                        mimeType = 'text/plain';
+                    }
+                }
+                editorEl.value = 'Loading...';
+                let res = await (this.file.fetch ? this.file.fetch() : fetch(this.file.url));
+                if (this.file == file) {
+                    setMimeType(mimeType);
+                    editorEl.value = await res.text();
+                }
+            }
+        };
         this._elByName('file-menu').addEventListener('change', (ev) => {
             if (ev.detail.index == 0) {
+                setMimeType('text/plain');
                 editorEl.value = '';
                 this.file = null;
-                setMimeType('text/plain');
             } else if (ev.detail.index == 1) {
                 save();
             } else if (ev.detail.index == 2) {
                 save(true);
+            } else if (ev.detail.index == 3) {
+                (async () => {
+                    load(await this.el.components.vrapp.selectFile());
+                })();
             }
         });
         this._elByName('pgup-button').addEventListener('click', (ev) => {
@@ -114,35 +142,13 @@ TODO:
         });
         this._elByName('format-menu').addEventListener('change', async (ev) => {
             setMimeType(formats[ev.detail.index].type);
+            editorEl.value = editorEl.value;
         });
         this._elByName('format-menu').setAttribute('values', formats.map(f => f.name).join(','));
 
         this.el.addEventListener('app-start', async (ev) => {
             this.appManager = ev.detail.appManager;
-            this.file = ev.detail.content;
-            if (this.file) {
-                this.el.setAttribute('title', `${this.file.name} - Notepad`);
-                let mimeType = this.file.type.split(";")[0].trim();
-                if (!mimeType) {
-                    let ext = this.file.name.split('.').pop();
-                    if (ext == 'go') {
-                        mimeType = 'text/x-go';
-                    } else if (ext == 'c' || ext == 'cc' || ext == 'cpp' || ext == 'h') {
-                        mimeType = 'text/x-c';
-                    } else if (ext == 'js' || ext == 'json') {
-                        mimeType = 'text/javascript';
-                    } else {
-                        mimeType = 'text/plain';
-                    }
-                }
-                setMimeType(mimeType);
-                editorEl.value = 'Loading...';
-                let res = await (this.file.fetch ? this.file.fetch() : fetch(this.file.url));
-                if (this.file != ev.detail.content) {
-                    return;
-                }
-                editorEl.value = await res.text();
-            }
+            load(ev.detail.content);
         }, { once: true });
 
         this.el.addEventListener('keydown', (ev) => {
