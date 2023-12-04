@@ -420,7 +420,10 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 					path.push(fi);
 				}
 				let ff = path.slice();
-				let items = (await folder.getFiles(0, 1000)).items;
+				let items = [];
+				try {
+					items = (await folder.getFiles(0, 1000)).items;
+				} catch (e) { }
 				if (storageService) {
 					ff.push(...items.filter(f => f.type == 'folder').map(f => [storageService.getFolder(f.path), f.name]));
 				}
