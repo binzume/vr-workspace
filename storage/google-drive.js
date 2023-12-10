@@ -4,11 +4,10 @@
 // <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
 
 
-const gapiUrl = 'https://apis.google.com/js/api.js?onload=gapiLoaded';
-const callbackName = 'gapiLoaded';
+const gapiUrl = 'https://apis.google.com/js/api.js';
 const clientIds = {
     "http://localhost:8080": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
-    "http://nas.binzume.net": "86954684848-e879qasd2bnnr4pcdiviu68q423gbq4m.apps.googleusercontent.com",
+    "http://nas.binzume.net": "763907720984-n3vo8j6d788jdg22p7sfqoturvtbqk3i.apps.googleusercontent.com",
     "https://binzume.github.io": "86954684848-okobt1r6kedh2cskabcgmbbqe0baphjb.apps.googleusercontent.com"
 };
 
@@ -92,16 +91,21 @@ export class GoogleDrive {
         if (!response.ok) throw new Error(response.statusText);
         return response;
     }
-    async update(fileId, blob) {
+    async update(fileId, body, type = null) {
         let url = "https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media";
         let headers = { 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token };
-        if (blob.type) {
-            headers['Content-Type'] = blob.type;
+        if (body.type || type) {
+            headers['Content-Type'] = body.type || type;
         }
 
-        let response = await fetch(url, { method: 'PATCH', headers: new Headers(headers), body: blob });
+        let response = await fetch(url, { method: 'PATCH', headers: new Headers(headers), body: body });
         if (!response.ok) throw new Error(response.statusText);
         return response;
+    }
+    async createWritable(fileId, type) {
+        let { readable, writable } = new TransformStream();
+        this.update(fileId, readable, type);
+        return writable;
     }
     async mkdir(name, parent = null) {
         return await gapi.client.drive.files.create({
@@ -111,7 +115,7 @@ export class GoogleDrive {
             mimeType: 'application/vnd.google-apps.folder'
         });
     }
-    async getFileBlob(fileId) {
+    async getBlob(fileId) {
         let url = this.getFileMediaUrl(fileId);
         let headers = { 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token };
         let response = await fetch(url, { headers: new Headers(headers) });
@@ -184,6 +188,8 @@ class GoogleDriveFileList {
             thumbnailUrl: (f.thumbnailLink && !f.thumbnailLink.startsWith("https://docs.google.com/")) ? f.thumbnailLink : null,
             updatedTime: f.modifiedTime,
             fetch(start, end) { return drive.fetch(this.id, start, end); },
+            async stream() { return (await drive.fetch(this.id)).body; },
+            createWritable() { return drive.createWritable(this.id, this.type); },
             update(blob) { return drive.update(this.id, blob); },
             remove() { return drive.remove(this.id); },
         };
@@ -194,7 +200,8 @@ class GoogleDriveFileList {
      */
     async writeFile(name, blob) {
         let f = await this.drive.create(name, '', blob.type, this._folderId);
-        return await this.drive.update(JSON.parse(f.body).id, blob);
+        await this.drive.update(JSON.parse(f.body).id, blob);
+        return await this.getFile(name);
     }
     async mkdir(name) {
         await this.drive.mkdir(name, this._folderId);
@@ -214,13 +221,10 @@ export class GoogleApiLoader {
             return GoogleApiLoader._promise;
         }
         return GoogleApiLoader._promise = new Promise((resolve) => {
-            globalThis[callbackName] = () => {
-                delete globalThis[callbackName];
-                resolve();
-            };
             let gapiScript = document.createElement('script');
             gapiScript.src = gapiUrl;
             gapiScript.async = true;
+            gapiScript.onload = resolve;
             document.body.append(gapiScript);
         });
     }

@@ -42,23 +42,20 @@ class FileSystemWrapper {
         }
         return Promise.all(fileTasks);
     }
-    async read(path, offset = 0, len) {
-        if (path.endsWith('#thumbnail.jpeg')) {
-            let file = await this.resolveFile(path.substring(0, path.lastIndexOf('#')));
-            let blob = await this.createThumbnail(file);
-            return blob.slice(offset, offset + len);
-        }
-        let file = await this.resolveFile(path);
-        return file.slice(offset, offset + len);
+    async blob(path) {
+        return await this.resolveFile(path);
     }
-    async write(path, offset = 0, data) {
+    async createWritable(path, options) {
         if (!this.writable) { throw 'readonly'; }
-        let handle = await this.resolvePath(path, 'file');
-        let writer = await handle.createWritable({ keepExistingData: true });
-        await writer.seek(offset);
-        await writer.write(data);
-        await writer.close();
-        return data.length;
+        if (options.mkdir) {
+            let p = path.lastIndexOf('/');
+            if (p > 0) {
+                await this.mkdir(path.substring(0, p));
+            }
+        }
+        let handle = await this.resolvePath(path, 'file', true);
+        let writer = await handle.createWritable(options);
+        return writer;
     }
     async remove(path, options) {
         if (!this.writable) { throw 'readonly'; }
@@ -81,27 +78,6 @@ class FileSystemWrapper {
             h = await h.getDirectoryHandle(p[i], { create: true });
         }
         return h;
-    }
-
-    /**
-     * @param {string} path 
-     * @param {Blob} content 
-     * @param {*} options 
-     */
-    async writeFile(path, content, options = {}) {
-        if (!this.writable) { throw 'readonly'; }
-        if (options.mkdir) {
-            let p = path.lastIndexOf('/');
-            if (p > 0) {
-                await this.mkdir(path.substring(0, p));
-            }
-
-        }
-        let handle = await this.resolvePath(path, 'file', true);
-        let writer = await handle.createWritable({ keepExistingData: options.keepExistingData });
-        await writer.write(content);
-        await writer.close();
-        return await this.statInternal(handle);
     }
 
     async getFile(path, options = {}) {
@@ -147,70 +123,10 @@ class FileSystemWrapper {
     async statInternal(handle) {
         if (handle.kind == 'file') {
             let f = await handle.getFile();
-            let stat = { type: f.type || 'file', name: f.name, size: f.size, updatedTime: f.lastModified, _file: f, _handle: handle }
-            if (["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"].includes(f.type)) {
-                stat.metadata = { thumbnail: "#thumbnail.jpeg" };
-            }
-            return stat;
+            return { type: f.type || '', name: f.name, size: f.size, updatedTime: f.lastModified, _file: f, _handle: handle }
         } else {
             return { type: 'folder', size: 0, name: handle.name, updatedTime: null, _handle: handle }
         }
-    }
-
-    /**
-     * @param {Blob} file 
-     * @returns {Promise<Blob>}
-     */
-    async createThumbnail(file, maxWidth = 200, maxHeight = 200) {
-        let canvas = document.createElement('canvas');
-        let drawThumbnail = (image, w, h) => {
-            if (w > maxWidth) {
-                h = h * maxWidth / w;
-                w = maxWidth;
-            }
-            if (h > maxHeight) {
-                w = w * maxHeight / h;
-                h = maxHeight;
-            }
-            canvas.width = w;
-            canvas.height = h;
-            canvas.getContext('2d').drawImage(image, 0, 0, w, h);
-        };
-        let objectUrl = URL.createObjectURL(file);
-        let media;
-        try {
-            if (file.type.startsWith('video')) {
-                // TODO: detect background tab
-                media = document.createElement('video');
-                media.muted = true;
-                media.autoplay = true;
-                await new Promise((resolve, reject) => {
-                    media.onloadeddata = resolve;
-                    media.onerror = reject;
-                    media.src = objectUrl;
-                    setTimeout(reject, 3000);
-                });
-                await new Promise((resolve, _reject) => {
-                    media.onseeked = resolve;
-                    media.currentTime = 3;
-                    setTimeout(resolve, 500);
-                });
-                drawThumbnail(media, media.videoWidth, media.videoHeight);
-            } else {
-                media = new Image();
-                await new Promise((resolve, reject) => {
-                    media.onload = resolve;
-                    media.onerror = reject;
-                    media.src = objectUrl;
-                    setTimeout(reject, 5000);
-                });
-                drawThumbnail(media, media.naturalWidth, media.naturalHeight);
-            }
-        } finally {
-            if (media) { media.src = ''; }
-            URL.revokeObjectURL(objectUrl);
-        }
-        return await new Promise((resolve, _) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
     }
 }
 
@@ -280,16 +196,18 @@ export class WebkitFileSystemWrapper {
         if (!this.filesystem) {
             await this.requestFileSystem();
         }
-        let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, {}, resolve, reject));
+        let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, { create: options.create }, resolve, reject));
         return await this.statInternal(file);
     }
-
+    async blob(path) {
+        let f = await this.getFile(path);
+        return f._file;
+    }
     /**
-     * @param {string} path 
-     * @param {Blob} content 
-     * @param {*} options 
+     * @param {string} path
+     * @param {*} options
      */
-    async writeFile(path, content, options = {}) {
+    async createWritable(path, options = {}) {
         if (!this.filesystem) {
             await this.requestFileSystem();
         }
@@ -301,16 +219,29 @@ export class WebkitFileSystemWrapper {
         }
         let file = await new Promise((resolve, reject) => this.filesystem.root.getFile(path, { create: true }, resolve, reject));
         let writer = await new Promise((resolve, reject) => file.createWriter(resolve, reject));
-        await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.truncate(0); });
-        await new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.write(content); });
-        return await this.statInternal(file);
+        /** @type {WritableStream & {truncate: (pos:number)=>Promise<void>}} */
+        // @ts-ignore
+        let ws = new WritableStream({
+            write: (/** @type {ArrayBuffer|any} */ chunk, _controller) => {
+                if (chunk.type == 'seek') {
+                    // TODO
+                    return;
+                }
+                return new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.write(chunk); });
+            }
+        });
+        ws.truncate = (sz) => new Promise((resolve, reject) => { writer.onwriteend = resolve; writer.onerror = reject; writer.truncate(sz); });
+        if (!options.keepExistingData) {
+            await ws.truncate(0);
+        }
+        return ws;
     }
     async statInternal(entry) {
         let file = entry.isFile ? (await new Promise((resolve, reject) => entry.file(resolve, reject))) : null;
         return {
             name: entry.name,
             type: entry.isFile ? file.type : 'folder',
-            size: file?.size,
+            size: file ? file.size : null,
             updatedTime: file ? file.lastModified : null,
             remove() { return new Promise((resolve, reject) => entry.remove(resolve, reject)); },
             _file: file,
@@ -319,13 +250,13 @@ export class WebkitFileSystemWrapper {
 }
 
 class WebkitFileSystemWrapperFileList {
-    constructor(path, storage, prefix = '', backend = '') {
+    constructor(path, storage, prefix = '', backendName = '') {
         this._storage = storage;
         this._pathPrefix = prefix;
         this._path = path;
         this.items = [];
         this.size = -1;
-        this.backend = backend;
+        this.backend = backendName;
     }
 
     async init() {
@@ -342,18 +273,31 @@ class WebkitFileSystemWrapperFileList {
         if (f._handle && f._handle.move) {
             f.rename = async (name) => f._handle.move(name);
         }
-        f.update = async (blob) => {
-            await this._storage.writeFile(path, blob);
-            f.size = blob.size;
-            f.type = blob.type;
-            return this;
-        };
-        if (f.metadata && f.metadata.thumbnail) {
-            f.thumbnail = { fetch: async (start, end) => new Response(await this._storage.read(path + f.metadata.thumbnail, start, 99999)) };
+        if (f.type != 'folder') {
+            f.update = async (blob) => {
+                let ws = await this._storage.createWritable(path);
+                await ws.getWriter().write(blob);
+                await ws.close();
+                f.size = blob.size;
+                f.type = blob.type;
+                return this;
+            };
+            f.createWritable = (options) => this._storage.createWritable(path, options);
         }
         if (f._file) {
             f.fetch = async (start, end) => {
                 return new Response(start != null ? f._file.slice(start, end) : f._file);
+            };
+            f.stream = () => f._file.stream();
+        }
+        if (["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"].includes(f.type)) {
+            f.thumbnail = {
+                type: 'image/jpeg',
+                fetch: async (start, end) => {
+                    let blob = await this._storage.blob(path);
+                    let thumb = await this._createThumbnail(blob);
+                    return new Response(thumb.slice(start || 0, end || thumb.size));
+                }
             };
         }
         return f;
@@ -399,7 +343,13 @@ class WebkitFileSystemWrapperFileList {
     }
 
     async writeFile(name, blob, options = {}) {
-        return this._procFile(await this._storage.writeFile(this._path + '/' + name, blob, options));
+        let path = this._path + '/' + name;
+        /** @type {WritableStream} */
+        let ws = await this._storage.createWritable(path, options);
+        let writer = ws.getWriter();
+        await writer.write(blob);
+        await writer.close();
+        return await this.getFile(name);
     }
 
     async getFile(name, options = {}) {
@@ -411,6 +361,62 @@ class WebkitFileSystemWrapperFileList {
             return null;
         }
         return this._pathPrefix + this._path.substring(0, this._path.lastIndexOf('/'));
+    }
+
+    /**
+     * @param {Blob} file 
+     * @returns {Promise<Blob>}
+     */
+    async _createThumbnail(file, maxWidth = 200, maxHeight = 200) {
+        let canvas = document.createElement('canvas');
+        let drawThumbnail = (image, w, h) => {
+            if (w > maxWidth) {
+                h = h * maxWidth / w;
+                w = maxWidth;
+            }
+            if (h > maxHeight) {
+                w = w * maxHeight / h;
+                h = maxHeight;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(image, 0, 0, w, h);
+        };
+        let objectUrl = URL.createObjectURL(file);
+        let media;
+        try {
+            if (file.type.startsWith('video')) {
+                // TODO: detect background tab
+                media = document.createElement('video');
+                media.muted = true;
+                media.autoplay = true;
+                await new Promise((resolve, reject) => {
+                    media.onloadeddata = resolve;
+                    media.onerror = reject;
+                    media.src = objectUrl;
+                    setTimeout(reject, 3000);
+                });
+                await new Promise((resolve, _reject) => {
+                    media.onseeked = resolve;
+                    media.currentTime = 3;
+                    setTimeout(resolve, 500);
+                });
+                drawThumbnail(media, media.videoWidth, media.videoHeight);
+            } else {
+                media = new Image();
+                await new Promise((resolve, reject) => {
+                    media.onload = resolve;
+                    media.onerror = reject;
+                    media.src = objectUrl;
+                    setTimeout(reject, 5000);
+                });
+                drawThumbnail(media, media.naturalWidth, media.naturalHeight);
+            }
+        } finally {
+            if (media) { media.src = ''; }
+            URL.revokeObjectURL(objectUrl);
+        }
+        return await new Promise((resolve, _) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
     }
 }
 

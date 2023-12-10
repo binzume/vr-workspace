@@ -84,6 +84,8 @@ declare global {
         remove?(): Promise<any>;
         rename?(name: string): Promise<any>;
         fetch?(): Promise<any>;
+        stream?(): Promise<ReadableStream>;
+        createWritable?(): Promise<WritableStream>;
         [k: string]: any;
     }
 
