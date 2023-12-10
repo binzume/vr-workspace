@@ -87,7 +87,7 @@ class MultilineText {
 		this.width = width;
 		this.height = height;
 		this.lineHeight = lineHeight;
-		this.visibleLineCount = Math.ceil(height / lineHeight);
+		this.visibleLineCount = Math.floor(height / lineHeight);
 
 		let textureLines = this.visibleLineCount + 1;
 		this._textureFreeLines = new Array(textureLines);

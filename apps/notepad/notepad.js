@@ -79,7 +79,7 @@ TODO:
             if (file) {
                 this.el.setAttribute('title', `${this.file.name} - Notepad`);
                 let mimeType = this.file.type.split(";")[0].trim();
-                if (!mimeType) {
+                if (!mimeType.startsWith('text/')) {
                     let ext = this.file.name.split('.').pop();
                     if (ext == 'go') {
                         mimeType = 'text/x-go';
