@@ -61,7 +61,7 @@ declare global {
 
     interface AppStartEventData {
         app: AppInfo;
-        services: { appManager: AppManager, storage?: FolderResolver & Folder, [key: string]: any };
+        services: { appManager: AppManager, storage?: PathResolver & Folder, [key: string]: any };
         appManager: AppManager;
         args: any;
         content: any;
@@ -72,6 +72,12 @@ declare global {
         skip(): void
     }
 
+    interface VRAppComponent {
+        context: AppStartEventData;
+        app: AppInfo;
+        saveFile(content: Blob, options?: any): Promise<FileInfo>;
+    }
+
     // Storage types
     interface FileInfo {
         type: string;
@@ -80,21 +86,13 @@ declare global {
         path: string;
         updatedTime: number;
         tags?: string[];
-        thumbnail?: { [k: string]: any };
+        thumbnail?: { type?: string, fetch?: () => Promise<Response>, [k: string]: any };
         remove?(): Promise<any>;
         rename?(name: string): Promise<any>;
-        fetch?(): Promise<any>;
+        fetch?(): Promise<Response>;
         stream?(): Promise<ReadableStream>;
         createWritable?(): Promise<WritableStream>;
         [k: string]: any;
-    }
-
-    interface FilesResult {
-        name?: string;
-        items: FileInfo[];
-        next: any;
-        total?: number;
-        more?: boolean;
     }
 
     interface Folder {
@@ -110,16 +108,18 @@ declare global {
         backend?: string;
     }
 
-    interface FolderResolver {
+    interface FilesResult {
+        name?: string;
+        items: FileInfo[];
+        next: any;
+        total?: number;
+        more?: boolean;
+    }
+
+    interface PathResolver {
         getFolder(path: string, prefix?: string): Folder;
         parsePath(path: string): string[][];
     }
 
-    interface VRAppComponent {
-        context: AppStartEventData;
-        app: AppInfo;
-        saveFile(content: Blob, options?: any): Promise<FileInfo>;
-    }
-
-    var storageList: FolderResolver & Folder & { addStorage: any, removeStorage: any };
+    var storageList: PathResolver & Folder & { addStorage: any, removeStorage: any };
 }

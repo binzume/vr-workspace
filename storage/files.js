@@ -615,9 +615,9 @@ function openItem(item) {
 
 class FileListView {
 	/**
-	 * @param {FolderResolver} folderResolver 
+	 * @param {PathResolver} pathResolver 
 	 */
-	constructor(folderResolver) {
+	constructor(pathResolver) {
 		this.el = document.getElementById('main-pane');
 		this.listEl = document.getElementById('item-list');
 		this.titleEl = document.getElementById('item-list-title');
@@ -626,7 +626,7 @@ class FileListView {
 		this.infoView.init(document.getElementById('file-info'));
 
 		this.imageLoadQueue = new ImageLoadQueue(4);
-		this.folderResolver = folderResolver;
+		this.pathResolver = pathResolver;
 		this.listCursor = new FileListCursor(null, isPlayable);
 
 		let onclick = (selector, f) => {
@@ -740,7 +740,7 @@ class FileListView {
 		let listTitleEl = this.titleEl;
 		listTitleEl.textContent = '';
 		let pp = '';
-		let dirs = this.folderResolver.parsePath(path);
+		let dirs = this.pathResolver.parsePath(path);
 		let name = dirs.pop();
 		dirs.forEach(function (p) {
 			pp += p[0];
@@ -763,7 +763,7 @@ class FileListView {
 		this.imageLoadQueue.clear();
 		this.listCursor.dispose();
 		this.el.classList.add('loading');
-		let folder = this.folderResolver.getFolder(this.path);
+		let folder = this.pathResolver.getFolder(this.path);
 		if (folder == null) {
 			return;
 		}
@@ -836,7 +836,7 @@ class FileListView {
 		if (f.type == 'folder' || f.type == 'archive' || f.type == 'list') {
 			let play = (ev) => {
 				ev.preventDefault();
-				let folder = this.folderResolver.getFolder(f.path);
+				let folder = this.pathResolver.getFolder(f.path);
 				let cursor = new FileListCursor(folder, isPlayable, { sortField: 'name', sortOrder: 'a' });
 				mediaPlayerController.setCursor(cursor);
 				cursor.loaded = (r) => cursor.moveOffset(1); // Play
@@ -970,7 +970,7 @@ window.addEventListener('DOMContentLoaded', (function (e) {
 	// Media player
 	let mediaPlayer = new MediaPlayer(document.getElementById('embed_player'));
 	mediaPlayerController.init(mediaPlayer);
-	let fileListView = new FileListView(globalThis.folderResolver);
+	let fileListView = new FileListView(globalThis.pathResolver);
 	globalThis.fileListView = fileListView;
 
 	function checkUrlFragment() {

@@ -80,7 +80,7 @@ async function chedckWebkitFileSystemStatus() {
     }
 }
 
-globalThis.folderResolver = globalThis.storageList;
+globalThis.pathResolver = globalThis.storageList;
 
 function initGoogleDriveUI() {
     document.querySelector('#google-drive-login').style.visibility = 'hidden';

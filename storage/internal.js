@@ -67,6 +67,11 @@ class JsonFileList extends BaseFileList {
         }
         this.size = result.total || (offset + result.items.length);
         this._name = result.name || this._path;
+		if (result.writable) {
+			for (let item of result.items) {
+				item.remove = () => fetch(this._url + item.path, { method: 'DELETE' });
+			}
+		}
         return {
             items: result.items,
             next: result.more ? offset + result.items.length : null,

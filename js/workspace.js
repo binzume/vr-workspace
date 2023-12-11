@@ -135,7 +135,7 @@ class AppManager {
 	async newContent(contentType, options = {}) {
 		let storageList = globalThis.storageList;
 		// TODO: File select dialog.
-		/** @type {FolderResolver} */
+		/** @type {PathResolver} */
 		// @ts-ignore
 		let accessor = Object.values(storageList.accessors).find(a => a.writable);
 		if (!accessor) {

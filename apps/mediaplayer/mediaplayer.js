@@ -63,7 +63,7 @@ class BaseFolderLoader {
 			type: 'folder',
 			name: this.path,
 			size: this.size,
-			thumbnailUrl: this._thumbnailUrl
+			thumbnail: { url: this._thumbnailUrl },
 		}, info || {});
 	}
 
@@ -256,8 +256,9 @@ AFRAME.registerComponent('media-selector', {
 		sortOrder: { default: "" },
 		openWindow: { default: false }
 	},
+	/** @type {PathResolver&Folder} */ _root: globalThis.storageList,
 	init() {
-		this.itemlist = globalThis.storageList;
+		this.itemlist = {};
 		this.item = {};
 		this.appManager = null;
 		let videolist = this._byName('medialist').components.xylist;
@@ -270,6 +271,9 @@ AFRAME.registerComponent('media-selector', {
 				let p = ev.detail.args.split(/\/(.*)/);
 				if (p.length >= 2) {
 					this.el.setAttribute('media-selector', { path: ev.detail.args, sortField: 'updatedTime', sortOrder: 'd' });
+				}
+				if (ev.detail.services.storage) {
+					this._root = ev.detail.services.storage;
 				}
 			}
 		}, { once: true });
@@ -451,9 +455,9 @@ AFRAME.registerComponent('media-selector', {
 			if (ev.detail.index == 0) {
 				this._openList(this.data.path, true);
 			} else if (ev.detail.index == 1) {
-				storageList.getFolder('Favs').addItem(this.item);
+				this._root.getFolder('Favs').addItem(this.item);
 			} else if (ev.detail.index == 2) {
-				storageList.getFolder('Favs').removeItem(this.item);
+				this._root.getFolder('Favs').removeItem(this.item);
 			}
 		});
 
@@ -471,7 +475,6 @@ AFRAME.registerComponent('media-selector', {
 	update() {
 		let path = this.data.path;
 		console.log("load list: ", path);
-		this.item = { type: "list", path: path, name: path };
 		if (this.el.components.vrapp) {
 			this.el.components.vrapp.args = path;
 		}
@@ -494,7 +497,7 @@ AFRAME.registerComponent('media-selector', {
 	},
 	_loadList(path) {
 		this.itemlist.onupdate = null;
-		let folder = storageList.getFolder(path);
+		let folder = this._root.getFolder(path);
 		if (folder == null) {
 			return;
 		}
@@ -503,6 +506,7 @@ AFRAME.registerComponent('media-selector', {
 		} else {
 			this.itemlist = new CachedFolderLoader(folder, path, { sortField: this.data.sortField, sortOrder: this.data.sortOrder });
 		}
+		this.item = { type: "folder", path: path, name: path };
 
 		this.el.setAttribute("title", "Loading...");
 		let mediaList = this._byName('medialist').components.xylist;
