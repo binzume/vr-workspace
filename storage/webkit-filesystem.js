@@ -1,6 +1,6 @@
 // https://developer.chrome.com/docs/apps/offline_storage/
 
-class FileSystemWrapper {
+class LocalFileSystemWrapper {
     /**
      * 
      * @param {FileSystemDirectoryHandle} handle 
@@ -249,7 +249,7 @@ export class WebkitFileSystemWrapper {
     }
 }
 
-class WebkitFileSystemWrapperFileList {
+class LocalFileSystemWrapperHandle {
     constructor(path, storage, prefix = '', backendName = '') {
         this._storage = storage;
         this._pathPrefix = prefix;
@@ -310,6 +310,10 @@ class WebkitFileSystemWrapperFileList {
             type: 'folder',
             size: this.size,
         };
+    }
+
+    async stat(options) {
+        return this._procFile(await this._storage.getFile(this._path, options));
     }
 
     async getFiles(offset, limit, options = null, signal = null) {
@@ -422,12 +426,13 @@ class WebkitFileSystemWrapperFileList {
 
 export async function install() {
     globalThis.storageAccessors = globalThis.storageAccessors || {};
-    let stdStorageWrapper = new FileSystemWrapper(null, navigator.storage);
+    let stdStorageWrapper = new LocalFileSystemWrapper(null, navigator.storage);
     if (stdStorageWrapper.available()) {
         globalThis.storageAccessors['local'] = {
             writable: true,
             name: "Local",
-            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, stdStorageWrapper, prefix, 'Local'),
+            getFolder: (folder, prefix) => new LocalFileSystemWrapperHandle(folder, stdStorageWrapper, prefix, 'Local'),
+            getFile: (folder, prefix) => new LocalFileSystemWrapperHandle(folder, stdStorageWrapper, prefix, 'Local').stat(),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
         };
     }
@@ -452,7 +457,8 @@ export async function install() {
     globalThis.storageAccessors['WebkitFileSystem'] = {
         writable: true,
         name: "WebkitLocal",
-        getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix, 'WebkitFileSystem'),
+        getFolder: (path, prefix) => new LocalFileSystemWrapperHandle(path, storageWrapper, prefix, 'WebkitFileSystem'),
+        getFile: (path, prefix) => new LocalFileSystemWrapperHandle(path, storageWrapper, prefix, 'WebkitFileSystem').stat(),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
     };
     if (!stdStorageWrapper.available()) {
@@ -460,7 +466,8 @@ export async function install() {
         globalThis.storageAccessors['local'] = {
             writable: true,
             name: "Local",
-            getFolder: (folder, prefix) => new WebkitFileSystemWrapperFileList(folder, storageWrapper, prefix, 'WebkitFileSystem'),
+            getFolder: (path, prefix) => new LocalFileSystemWrapperHandle(path, storageWrapper, prefix, 'WebkitFileSystem'),
+            getFile: (path, prefix) => new LocalFileSystemWrapperHandle(path, storageWrapper, prefix, 'WebkitFileSystem').stat(),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : [],
         };
     }

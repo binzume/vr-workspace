@@ -96,9 +96,8 @@ declare global {
     }
 
     interface Folder {
-        getInfo?(): Promise<{ name: string, [k: string], any }>;
+        getInfo?(): Promise<FileInfo>;
         getFiles(offset?: any, limit?: number, options?: object, signal?: AbortSignal): Promise<FilesResult>;
-        getFile(name: string, options?: any): Promise<FileInfo>;
         writeFile?(name: string, content: Blob, options?: any): Promise<any>;
         mkdir?(name: string): string;
         getParentPath(): string;
@@ -117,7 +116,8 @@ declare global {
     }
 
     interface PathResolver {
-        getFolder(path: string, prefix?: string): Folder;
+        getFile(path: string, mountpoint?: string): Promise<FileInfo>;
+        getFolder(path: string, mountpoint?: string): Folder;
         parsePath(path: string): string[][];
     }
 

@@ -38,7 +38,7 @@ export class GoogleDrive {
         // application/vnd.google-apps.folder
         return response.result;
     }
-    /** @returns {Promise<any[]>} */
+    /** @returns {Promise<any>} */
     async getFile(fileId) {
         let response = await gapi.client.drive.files.get({
             fileId: fileId,
@@ -124,9 +124,9 @@ export class GoogleDrive {
     }
 }
 
-class GoogleDriveFileList {
-    constructor(folderId, drive, pathPrefix) {
-        this._folderId = folderId;
+class GoogleDriveFileHandle {
+    constructor(fileId, drive, pathPrefix) {
+        this._fileId = fileId;
         this._name = "";
         this._parent = null;
         /** @type {GoogleDrive} */
@@ -138,7 +138,7 @@ class GoogleDriveFileList {
     }
     async getInfo() {
         if (!this._name) {
-            await this.drive.getFile(this._folderId).then(f => {
+            await this.drive.getFile(this._fileId).then(f => {
                 this._name = f.name;
                 if (f.parents && f.parents.length > 0) {
                     this._parent = f.parents[0];
@@ -148,7 +148,12 @@ class GoogleDriveFileList {
         return {
             type: 'folder',
             name: this._name,
+            path: this._pathPrefix + this._fileId,
+            size: -1,
         };
+    }
+    async stat(options = {}) {
+        return this._procFile(await this.drive.getFile(this._fileId));
     }
     async getFiles(offset, limit, options = null, signal = null) {
         options = options || {};
@@ -161,7 +166,7 @@ class GoogleDriveFileList {
         } else if (options.sortField == "size") {
             driveOption.orderBy = "quotaBytesUsed" + order;
         }
-        let result = await this.drive.getFiles(this._folderId, limit, offset ? offset : null, driveOption);
+        let result = await this.drive.getFiles(this._fileId, limit, offset ? offset : null, driveOption);
         signal?.throwIfAborted();
         return {
             items: result.files.map(f => this._procFile(f)),
@@ -169,7 +174,7 @@ class GoogleDriveFileList {
         };
     }
     async getFile(name) {
-        let files = await this.drive.getFileByName(this._folderId, name);
+        let files = await this.drive.getFileByName(this._fileId, name);
         if (files && files.length) {
             return this._procFile(files[0]);
         }
@@ -177,14 +182,13 @@ class GoogleDriveFileList {
     }
     _procFile(f) {
         let drive = this.drive;
-        return {
+        return f && {
             type: f.mimeType == "application/vnd.google-apps.folder" ? "folder" : f.mimeType,
-            duration: 0,
             id: f.id,
             path: this._pathPrefix + f.id,
             name: f.name,
             size: f.size,
-            tags: [this._folderId],
+            tags: [],
             thumbnailUrl: (f.thumbnailLink && !f.thumbnailLink.startsWith("https://docs.google.com/")) ? f.thumbnailLink : null,
             updatedTime: f.modifiedTime,
             fetch(start, end) { return drive.fetch(this.id, start, end); },
@@ -199,12 +203,12 @@ class GoogleDriveFileList {
      * @param {Blob} blob 
      */
     async writeFile(name, blob) {
-        let f = await this.drive.create(name, '', blob.type, this._folderId);
+        let f = await this.drive.create(name, '', blob.type, this._fileId);
         await this.drive.update(JSON.parse(f.body).id, blob);
         return await this.getFile(name);
     }
     async mkdir(name) {
-        await this.drive.mkdir(name, this._folderId);
+        await this.drive.mkdir(name, this._fileId);
     }
     getParentPath() {
         return this._parent && this._pathPrefix + this._parent;
@@ -212,6 +216,7 @@ class GoogleDriveFileList {
 }
 
 export class GoogleApiLoader {
+    static _promise = null;
     available() {
         return clientIds[location.origin] !== undefined;
     }
@@ -265,7 +270,8 @@ export async function install() {
         writable: true,
         name: "Google Drive",
         root: 'root',
-        getFolder: (folder, prefix) => new GoogleDriveFileList(folder, drive, prefix),
+        getFolder: (path, prefix) => new GoogleDriveFileHandle(path, drive, prefix),
+        getFile: (path, prefix) => new GoogleDriveFileHandle(path, drive, prefix).stat(),
         parsePath: (path) => path ? [[path]] : []
     };
     return true;

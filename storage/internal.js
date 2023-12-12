@@ -29,6 +29,16 @@ class JsonFileList extends BaseFileList {
         this._pathPrefix = prefix;
     }
 
+    async stat(options = {}, signal = null) {
+        let params = "?limit=0";
+        let response = await fetch(this._url + params, { signal: signal });
+        if (!response.ok) {
+            throw "fetch error";
+        }
+        let result = await response.json();
+        return this._procFile(result.item);
+    }
+
     async getFiles(offset, limit, options = null, signal = null) {
         options ||= {};
         let params = "?offset=" + offset;
@@ -67,16 +77,21 @@ class JsonFileList extends BaseFileList {
         }
         this.size = result.total || (offset + result.items.length);
         this._name = result.name || this._path;
-		if (result.writable) {
-			for (let item of result.items) {
-				item.remove = () => fetch(this._url + item.path, { method: 'DELETE' });
-			}
-		}
+        if (result.writable) {
+            for (let item of result.items) {
+                this._procFile(item);
+            }
+        }
         return {
             items: result.items,
             next: result.more ? offset + result.items.length : null,
             total: result.total
         };
+    }
+    _procFile(f) {
+        if (!f) { return null; }
+        f.remove = () => fetch(this._url + f.path, { method: 'DELETE' });
+        return f;
     }
 
     getParentPath() {
@@ -106,9 +121,17 @@ class ArrayFileList extends BaseFileList {
             type: 'folder',
             name: this._name,
             size: this.items.length,
+            path: this._pathPrefix,
+            updatedTime: null,
         };
     }
-    setItems(items) {
+    async getFile(path) {
+        if (!path) {
+            return await this.getInfo();
+        }
+        return this.items.find(i => i.path == path);
+    }
+    setItems(/** @type {FileInfo[]} */items) {
         this.items = items;
         this.size = this.items.length;
         this.notifyUpdate();
@@ -131,7 +154,7 @@ class ArrayFileList extends BaseFileList {
         if (orderBy === "name") {
             this.items.sort((a, b) => (a.name || "").localeCompare(b.name) * r);
         } else if (orderBy === "updatedTime") {
-            this.items.sort((a, b) => (a.updatedTime || "").localeCompare(b.updatedTime) * r);
+            this.items.sort((a, b) => ((a.updatedTime && b.updatedTime) ? a.updatedTime - b.updatedTime : 0) * r);
         } else if (orderBy === "size") {
             this.items.sort((a, b) => ((a.size && b.size) ? a.size - b.size : 0) * r);
         } else if (orderBy === "type") {
@@ -170,7 +193,7 @@ class LocalList extends ArrayFileList {
 
 class StorageList extends ArrayFileList {
     /**
-     * @param {Record<string, StorageEntry>} accessors 
+     * @param {Record<string, PathResolver & {name: string, root: string, entrypoints: any[]}>} accessors 
      */
     constructor(accessors) {
         super([], '', 'Storage');
@@ -191,11 +214,11 @@ class StorageList extends ArrayFileList {
             }
             if (sa.entrypoints && Object.keys(sa.entrypoints).length) {
                 Object.keys(sa.entrypoints).forEach(n => {
-                    items.push({ name: n, type: 'folder', path: k + '/' + sa.entrypoints[n], updatedTime: '' });
+                    items.push({ name: n, type: 'folder', path: k + '/' + sa.entrypoints[n], updatedTime: null });
                 });
             } else {
                 let path = sa.root ? '/' + sa.root : '';
-                items.push({ name: sa.name, type: 'folder', path: k + path, updatedTime: '' });
+                items.push({ name: sa.name, type: 'folder', path: k + path, updatedTime: null });
             }
         }
         this.setItems(items);
@@ -232,6 +255,13 @@ class StorageList extends ArrayFileList {
         let [storage, spath] = this._splitPath(path);
         return this.accessors[storage]?.getFolder(spath, prefix + storage + '/');
     }
+    getFile(path, prefix = '') {
+        if (!path) {
+            return this.getInfo();
+        }
+        let [storage, spath] = this._splitPath(path);
+        return this.accessors[storage]?.getFile(spath, prefix + storage + '/');
+    }
     parsePath(path) {
         if (!path) {
             return [['', 'Storages']];
@@ -248,7 +278,7 @@ class StorageList extends ArrayFileList {
 
 
 // install
-(async function () {
+(function () {
     let storageList = new StorageList(globalThis.storageAccessors);
     globalThis.storageAccessors = new Proxy({}, {
         // NOTE: Storage can only be accessed via storageList.
@@ -260,12 +290,12 @@ class StorageList extends ArrayFileList {
             return storageList.removeStorage(key);
         },
     });
-    // @ts-ignore
     globalThis.storageList = storageList;
 
     globalThis.storageAccessors['Favs'] = {
         name: "Favorites",
-        getFolder: (folder, prefix) => new LocalList(folder, 'Favorites', prefix),
+        getFile: (path, prefix) => new LocalList(path, 'Favorites', prefix).getFile(path),
+        getFolder: (path, prefix) => new LocalList(path, 'Favorites', prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
 
@@ -274,6 +304,7 @@ class StorageList extends ArrayFileList {
         globalThis.storageAccessors['MEDIA'] = {
             name: "Media",
             entrypoints: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
+            getFile: (path, prefix) => null, // TODO
             getFolder: (path, prefix) => new JsonFileList('/api/' + path, path, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
@@ -281,7 +312,8 @@ class StorageList extends ArrayFileList {
     globalThis.storageAccessors['DEMO'] = {
         name: "Demo",
         root: "list.json",
-        getFolder: (folder, prefix) => new JsonFileList("https://binzume.github.io/demo-assets/" + folder, folder, prefix),
+        getFile: (path, prefix) => new JsonFileList("https://binzume.github.io/demo-assets/" + path, path, prefix).stat(),
+        getFolder: (path, prefix) => new JsonFileList("https://binzume.github.io/demo-assets/" + path, path, prefix),
         parsePath: (path) => path ? path.split('/').map(p => [p]) : []
     };
     return true;
