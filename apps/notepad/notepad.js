@@ -2,8 +2,9 @@
 
 AFRAME.registerComponent('notepad-app', {
     schema: {},
+    /** @type {FileInfo} */
+    file: null,
     init() {
-        this.file = null;
         this.appManager = null;
         let editorEl = /** @type {AFRAME.AEntity & {value: string}} */ (this.el.querySelector('[texteditor]'));
         let editor = editorEl.components.texteditor;
@@ -95,7 +96,7 @@ TODO:
                 let res = await (this.file.fetch ? this.file.fetch() : fetch(this.file.url));
                 if (this.file == file) {
                     setMimeType(mimeType);
-                    editorEl.value = await res.text();
+                    editorEl.value = (await res.text()).replace("\r\n", "\n");
                 }
             }
         };
