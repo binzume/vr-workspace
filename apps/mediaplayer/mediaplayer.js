@@ -123,7 +123,7 @@ class CachedFolderLoader extends BaseFolderLoader {
 			console.log("fetch page:", page, signal.aborted);
 			let result = await this.folder.getFiles(page * this._pageSize, this._pageSize, this.options, signal);
 			this.size = result.total || page * this._pageSize + result.items.length + (result.next ? 1 : 0);
-			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnailUrl;
+			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnail?.url;
 			return result.items;
 		})(ac.signal);
 		try {
@@ -173,12 +173,12 @@ class ArrayFolderLoader extends BaseFolderLoader {
 	async _load() {
 		if (this._loadPromise !== null) return await this._loadPromise;
 		this._loadPromise = (async () => {
-			let result = await this.folder.getFiles(this._cursor, 200, this.options, null);
+			let result = await this.folder.getFiles(this._cursor, 200, this.options);
 
 			this._items = this._items.concat(result.items);
 			this._cursor = result.next;
 			this.size = result.total || this._items.length + (result.next ? 1 : 0);
-			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnailUrl;
+			if (!this._thumbnailUrl && result.items[0]) this._thumbnailUrl = result.items[0].thumbnail?.url;
 			this.onupdate?.();
 		})();
 		try {
@@ -272,9 +272,9 @@ AFRAME.registerComponent('media-selector', {
 				if (p.length >= 2) {
 					this.el.setAttribute('media-selector', { path: ev.detail.args, sortField: 'updatedTime', sortOrder: 'd' });
 				}
-				if (ev.detail.services.storage) {
-					this._root = ev.detail.services.storage;
-				}
+			}
+			if (ev.detail.services.storage) {
+				this._root = ev.detail.services.storage;
 			}
 		}, { once: true });
 
@@ -379,14 +379,14 @@ AFRAME.registerComponent('media-selector', {
 						el.components.xycanvas.updateTexture();
 					};
 
-					if (item.thumbnailUrl) {
+					if (item.thumbnail?.url) {
 						let image = new Image();
 						image.crossOrigin = "anonymous";
 						image.referrerPolicy = "origin-when-cross-origin";
 						image.onload = function () {
 							drawThumbnail(image);
 						};
-						image.src = item.thumbnailUrl; // TODO: cancellation
+						image.src = item.thumbnail?.url; // TODO: cancellation
 					} else if (item.thumbnail?.fetch) {
 						(async () => {
 							/** @type {Response} */
@@ -416,28 +416,28 @@ AFRAME.registerComponent('media-selector', {
 		videolist.el.addEventListener('clickitem', async (ev) => {
 			let pos = ev.detail.index;
 			let item = await this.itemlist.get(pos);
-			if (item.url == null && item.type.startsWith("application/")) {
-				// HACK: for Google drive.
-				let url = item.thumbnailUrl;
-				if (url.includes('.googleusercontent.com/')) {
-					url = url.replace(/=s\d+$/, '=s1600');
-				}
-				item = Object.assign({}, item, { fetch: () => fetch(url), type: 'image/jpeg' });
-			}
 			console.log(item);
-			if (item.type === "list" || item.type === "tag") {
+			if (item.type === "list" || item.type === "tag" || item.type == "folder") {
 				this._openList(item.path || this.data.path + '/' + item.name);
-			} else if (this.appManager && this.appManager.openContent(item)) {
+			} else if (this.appManager && this.appManager.openContent(item, { folder: this.itemlist.folder })) {
 				// opened
-			} else if (item.type == "folder" || item.type == "archive") {
+			} else if (item.type == "archive") {
 				this._openList(item.path || this.data.path + '/' + item.name, item.type == "archive");
 			} else {
+				if (item.url == null && item.type.startsWith("application/") && item.thumbnail?.url) {
+					// HACK: for Google drive.
+					let url = item.thumbnail.url;
+					if (url.includes('.googleusercontent.com/')) {
+						url = url.replace(/=s\d+$/, '=s1600');
+					}
+					item = Object.assign({}, item, { fetch: () => fetch(url), type: 'image/jpeg' });
+				}
 				var cursor = new FileListCursor(this.itemlist, pos, (item) => {
 					let t = item.type.split("/")[0];
 					return t == "image" || t == "video" || t == "audio";
 				});
-				// @ts-ignore
 				let mp = this.el.sceneEl.systems["media-player"];
+				// @ts-ignore
 				if (!mp.playContent(item, cursor)) {
 					(await this.appManager.start('app-media-player')).addEventListener('loaded', e => {
 						mp.playContent(item, cursor);
@@ -514,7 +514,7 @@ AFRAME.registerComponent('media-selector', {
 		this.itemlist.getInfo().then((info) => {
 			this.item.path = path;
 			this.item.name = info.name;
-			this.item.thumbnailUrl = info.thumbnailUrl;
+			this.item.thumbnailUrl = info.thumbnail?.url;
 			mediaList.setContents(this.itemlist, this.itemlist.size);
 			this.itemlist.onupdate = () => {
 				setTimeout(() => mediaList.setContents(this.itemlist, this.itemlist.size, false), 0);

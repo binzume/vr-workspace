@@ -893,7 +893,7 @@ class FileListView {
 			optionEls.push(mkEl('li', mkEl('button', 'Rename', {
 				onclick: async () => {
 					let name = prompt('Rename', f.name);
-					if (name != f.name) {
+					if (name && name != f.name) {
 						await f.rename(name);
 						this._refreshItems();
 					}

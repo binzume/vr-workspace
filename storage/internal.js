@@ -64,7 +64,12 @@ class JsonFileList extends BaseFileList {
         };
         for (let item of result.items) {
             item.url = convUrl(item.url);
-            item.thumbnailUrl = convUrl(item.thumbnailUrl);
+            if (item.thumbnailUrl && !item.thumbnail) {
+                item.thumbnail = { url: item.thumbnailUrl };
+            }
+            if (item.thumbnail?.url) {
+                item.thumbnail.url = convUrl(item.thumbnail.url);
+            }
             if (item.type == '') {
                 let m = item.name.match(/\.(\w+)$/);
                 if (m) {
@@ -91,7 +96,15 @@ class JsonFileList extends BaseFileList {
     _procFile(f) {
         if (!f) { return null; }
         f.remove = () => fetch(this._url + f.path, { method: 'DELETE' });
+        f.createWritable = (options) => {
+            let { readable, writable } = new TransformStream();
+            fetch(this._url + f.path, { method: 'POST', body: readable });
+            return writable;
+        };
         return f;
+    }
+    async writeFile(name, blob, options) {
+        await fetch(this._url + name, { method: 'POST', body: blob });
     }
 
     getParentPath() {
@@ -193,7 +206,7 @@ class LocalList extends ArrayFileList {
 
 class StorageList extends ArrayFileList {
     /**
-     * @param {Record<string, PathResolver & {name: string, root: string, entrypoints: any[]}>} accessors 
+     * @param {Record<string, PathResolver & {name: string, root: string, entrypoints: any[], detach?: any}>} accessors 
      */
     constructor(accessors) {
         super([], '', 'Storage');
@@ -218,7 +231,7 @@ class StorageList extends ArrayFileList {
                 });
             } else {
                 let path = sa.root ? '/' + sa.root : '';
-                items.push({ name: sa.name, type: 'folder', path: k + path, updatedTime: null });
+                items.push({ name: sa.name, type: 'folder', path: k + path, updatedTime: null, remove: () => this.removeStorage(k) });
             }
         }
         this.setItems(items);
@@ -244,6 +257,7 @@ class StorageList extends ArrayFileList {
     }
     removeStorage(id) {
         if (!this.accessors[id]) { return false; }
+        this.accessors[id].detach && this.accessors[id].detach();
         delete this.accessors[id];
         this._update();
         return true;
@@ -304,7 +318,7 @@ class StorageList extends ArrayFileList {
         globalThis.storageAccessors['MEDIA'] = {
             name: "Media",
             entrypoints: { "Tags": "tags", "All": "tags/.ALL_ITEMS", "Volumes": "volumes" },
-            getFile: (path, prefix) => null, // TODO
+            getFile: (path, prefix) => new JsonFileList('/api/' + path, path, prefix).stat(),
             getFolder: (path, prefix) => new JsonFileList('/api/' + path, path, prefix),
             parsePath: (path) => path ? path.split('/').map(p => [p]) : []
         };
