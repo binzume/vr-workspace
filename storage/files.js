@@ -796,14 +796,14 @@ class FileListView {
 
 	_createItemEl(f, prefix) {
 		let iconEl = mkEl('img', [], { 'className': 'thumbnail' });
-		if (f.thumbnail && f.thumbnail.fetch) {
+		if (f.thumbnail && f.thumbnail.fetch && !f.thumbnail.url) {
 			this.imageLoadQueue.add(iconEl, async el => {
 				let url = URL.createObjectURL(await (await f.thumbnail.fetch()).blob());
 				el.addEventListener('load', ev => URL.revokeObjectURL(url), { once: true });
 				el.src = url;
 			});
 		} else {
-			let turl = f.thumbnailUrl || (f.type == 'folder' || f.type == 'list' ? 'images/icon_folder.svg' : 'images/icon_file.svg');
+			let turl = f.thumbnail && f.thumbnail.url || (f.type == 'folder' || f.type == 'list' ? 'images/icon_folder.svg' : 'images/icon_file.svg');
 			this.imageLoadQueue.add(iconEl, el => el.src = turl);
 		}
 
