@@ -627,20 +627,24 @@ AFRAME.registerComponent('texteditor', {
 			} else if (ev.code != 'Enter') {
 				this.insertText(ev.key);
 			}
+			ev.preventDefault();
 		});
 
 		let caretMoves = {
 			ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowDown: [1, 0], ArrowUp: [-1, 0],
 			PageDown: [8, 0], PageUp: [-8, 0],
 		};
+		let caretMoves2 = { KeyH: [0, -1], KeyJ: [-1, 0], KeyK: [1, 0], KeyL: [0, 1] };
 		el.addEventListener('keydown', (ev) => {
-			if (caretMoves[ev.code]) {
+			let caretMove = caretMoves[ev.code] || ev.altKey && caretMoves2[ev.code];
+			if (caretMove) {
 				let range = ev.shiftKey ? this.textView.selection?.clone() ?? new TextRange(this.caret.position.clone()) : null;
-				this.caret.move(caretMoves[ev.code][0], caretMoves[ev.code][1]);
+				this.caret.move(caretMove[0], caretMove[1]);
 				if (range) {
 					range.end = this.caret.position.clone();
 				}
 				this.textView.setSelection(range);
+				ev.preventDefault();
 			} else if (ev.code == 'Backspace') {
 				if (!data.editable) { return; }
 				let range = this.textView.selection || new TextRange(this.caret.position.withOffset(0, -1), this.caret.position);
