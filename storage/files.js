@@ -87,12 +87,16 @@ class MediaPlayer {
 		this.onEnded = null;
 		/** @type {HTMLElement} */
 		this.contentEl = el.querySelector('.media-player-content');
+		window.addEventListener('popstate', ev => !this.el.classList.contains('small') && this.hide());
 	}
 	open(item) {
 		this.el.style.display = 'block';
 		this.el.classList.add('loading');
 		if (!this.el.classList.contains('small')) {
 			document.body.classList.add('lockscroll');
+			if (history.state != 'player') {
+				history.pushState('player', '');
+			}
 		}
 		this._clearMediaEl();
 		if (Array.isArray(item)) {
@@ -161,6 +165,10 @@ class MediaPlayer {
 		}
 	}
 	hide() {
+		if (history.state == 'player') {
+			history.back();
+			return;
+		}
 		if (!this.el) return;
 		document.body.classList.remove('lockscroll');
 		this.el.style.display = 'none';
@@ -187,6 +195,9 @@ class MediaPlayer {
 			document.body.classList.remove('lockscroll');
 		} else {
 			document.body.classList.add('lockscroll');
+			if (history.state != 'player') {
+				history.pushState('player', '');
+			}
 		}
 	}
 	isFullSize() {
