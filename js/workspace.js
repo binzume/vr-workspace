@@ -13,6 +13,27 @@ class AppManager {
 		this.contentHandlers = [this.defailtContentHandler.bind(this)];
 		/** @type {Set<string>} */
 		this.loadedModules = new Set();
+		/** @type {{[key:string]: boolean | string | null}} */
+		this._flags = {};
+	}
+
+	async init(options = {}) {
+		// options.appSelector && this.loadAppList(options.appSelector);
+		this._flags = JSON.parse(localStorage.getItem('flags') || '{}');
+		let scriptFlags = [
+			{ flag: 'xranchor', def: false, id: 'script-xranchor', src: 'apps/xranchortest/xranchor.js' },
+			{ flag: 'xrplane', def: false, id: 'script-xrplane', src: 'js/xrplane.js' },
+			{ flag: 'hand-controller', def: false, id: 'script-hand-controller', src: 'js/hand-controller.js' },
+			{ flag: 'physics', def: false, id: 'script-physics', src: 'https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js' },
+		];
+		await Promise.all(
+			scriptFlags
+				.filter(f => this.getFlag(f.flag, f.def))
+				.map(f => this._loadScript(f.id, f.src)));
+	}
+
+	getFlag(/** @type {string} */ name, def) {
+		return this._flags[name] == null ? def : this._flags[name];
 	}
 
 	/**
@@ -256,38 +277,47 @@ class AppManager {
 	 * @param {string} srcUrl 
 	 */
 	async _procScriptEl(script, srcUrl) {
+		if (script.type == 'importmap') { return; }
+		let sid = script.id;
 		for (let [name, id] of [['aframe-master.min.js', 'script-aframe'], ['xylayout-all.min.js', 'script-xylayout']]) {
-			if (!script.id && script.src.includes(name)) {
+			if (!sid && script.src.includes(name)) {
 				console.warn(srcUrl, "id:" + id);
-				script.id = id;
+				sid = id;
 			}
 		}
+		await this._loadScript(sid, script.src, script);
+	}
+
+	async _loadScript(id, src, srcEl = null) {
 		let dedup = (s) => {
 			if (!s) { return true; }
 			if (this.loadedModules.has(s)) { return false; }
 			this.loadedModules.add(s);
 			return true;
 		}
-		if (script.type == 'importmap') { return; }
-		if (!dedup(script.id) || !dedup(script.src) || (script.id && document.getElementById(script.id))) { return; }
+		if (!dedup(id) || !dedup(src) || (id && document.getElementById(id))) { return; }
 		await new Promise((resolve, reject) => {
 			/** @type {HTMLScriptElement} */
 			// @ts-ignore
-			let el = document.createElement('script'); // TODO: document.importNode(script, true);
-			for (let attr of script.attributes) {
-				attr.nodeName != 'src' && el.setAttribute(attr.nodeName, attr.nodeValue);
+			let el = document.createElement('script');
+			if (srcEl) {
+				// TODO: document.importNode(srcEl, true)
+				for (let attr of srcEl.attributes) {
+					attr.nodeName != 'src' && el.setAttribute(attr.nodeName, attr.nodeValue);
+				}
+				el.innerHTML = srcEl.innerHTML;
 			}
-			el.innerHTML = script.innerHTML;
-			if (script.src) {
+			if (src) {
 				el.onload = resolve;
 				el.onerror = reject;
-				el.src = script.src;
+				el.src = src;
 				document.querySelector('head').append(el);
 			} else {
 				document.querySelector('head').append(el);
 				resolve();
 			}
 		});
+		return true;
 	}
 
 	/**
@@ -375,7 +405,7 @@ AFRAME.registerComponent('vrapp', /** @implements {VRAppComponent}  */ {
 	 * @returns {Promise<FileInfo>}
 	 */
 	async selectFile(options = {}) {
-		return (await this._selectFileInternal(options, false)).file;
+		return (await this._selectFileInternal(options, options.create || false)).file;
 	},
 	async _selectFileInternal(options, create) {
 		function mkEl(tag, children, attrs) {
@@ -864,6 +894,12 @@ window.addEventListener('DOMContentLoaded', async (ev) => {
 	let sceneEl = document.querySelector('a-scene');
 	if (window.isSecureContext && sceneEl.components['device-orientation-permission-ui']) {
 		sceneEl.components['device-orientation-permission-ui'].showHTTPAlert = () => { };
+	}
+
+	if (sceneEl.hasLoaded) {
+		appManager.init();
+	} else {
+		sceneEl.addEventListener('loaded', (ev) => appManager.init(), { once: true });
 	}
 
 	// gesture

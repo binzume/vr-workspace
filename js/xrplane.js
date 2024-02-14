@@ -2,6 +2,7 @@ AFRAME.registerSystem('xrplane-preview', {
 	/** @type {Set<XRPlane>} */
 	_planes: null,
 	_line: false,
+	_face: true,
 	/** @type {THREE.Material} */
 	_material: null,
 	/** @type {THREE.LineBasicMaterial} */
@@ -9,10 +10,16 @@ AFRAME.registerSystem('xrplane-preview', {
 	/** @type {THREE.Group} */
 	_rootObject: null,
 	_tickCount: 0,
-    /** @type {{driver: any}} */
+	/** @type {{driver: any}} */
 	_physics: null,
 	_physicsBodies: [],
 	init() {
+		let flags = JSON.parse(localStorage.getItem('flags') || '{}');
+		if (flags['xrplane-wireframe']) {
+			this._line = true;
+			this._face = false;
+		}
+
 		this._planes = new Set();
 		let webxr = this.el.sceneEl.getAttribute('webxr') || {};
 		let features = webxr.optionalFeatures ||= [];
@@ -26,9 +33,11 @@ AFRAME.registerSystem('xrplane-preview', {
 				linewidth: 2,
 			});
 		}
-		this._material = new THREE.MeshBasicMaterial({
-			colorWrite: false,
-		});
+		if (this._face) {
+			this._material = new THREE.MeshBasicMaterial({
+				colorWrite: false,
+			});
+		}
 		this._rootObject = new THREE.Group();
 		this.el.setObject3D('xrplanes', this._rootObject);
 
@@ -78,7 +87,7 @@ AFRAME.registerSystem('xrplane-preview', {
 				let points = plane.polygon.map(p => new THREE.Vector3().copy(p));
 				let pose = frame.getPose(plane.planeSpace, space);
 				if (this._line) {
-					let geometry = new THREE.BufferGeometry().setFromPoints( points );
+					let geometry = new THREE.BufferGeometry().setFromPoints(points);
 					let line = new THREE.Line(geometry, this._lineMaterial);
 					line.position.copy(pose.transform.position);
 					line.quaternion.copy(pose.transform.orientation);
@@ -86,30 +95,31 @@ AFRAME.registerSystem('xrplane-preview', {
 				}
 				if (points.length > 3) {
 					let verts = [];
-					verts.push(points[0], points[1], points[2]);
-					verts.push(points[0], points[2], points[3]);
-					let minX = 999, maxX = -999, minY = 999, maxY = -999;
+					for (let i = 0; i <= points.length - 3; i++) {
+						verts.push(points[0], points[1 + i], points[2 + i]);
+					}
+					let minX = 999, maxX = -999, minZ = 999, maxZ = -999;
 					for (let p of points) {
 						minX = Math.min(minX, p.x);
 						maxX = Math.max(maxX, p.x);
-						minY = Math.min(minY, p.z);
-						maxY = Math.max(maxY, p.z);
+						minZ = Math.min(minZ, p.z);
+						maxZ = Math.max(maxZ, p.z);
 					}
-					let w = maxX - minX, h = maxY - minY;
-					// let geometry = new THREE.BoxGeometry(w, 0.05, h);
-					let geometry = new THREE.BufferGeometry().setFromPoints( verts );
-					let wall = new THREE.Mesh(geometry, this._material);
-					wall.position.copy(pose.transform.position);
-					wall.quaternion.copy(pose.transform.orientation);
-					wall.renderOrder = -1;
-					this._rootObject.add(wall);
-
+					let w = maxX - minX, h = maxZ - minZ;
+					if (this._face) {
+						let geometry = new THREE.BufferGeometry().setFromPoints(verts);
+						let wall = new THREE.Mesh(geometry, this._material);
+						wall.position.copy(pose.transform.position);
+						wall.quaternion.copy(pose.transform.orientation);
+						wall.renderOrder = -1;
+						this._rootObject.add(wall);
+					}
 					if (this._physics) {
 						let body = new CANNON.Body({
 							type: CANNON.Body.STATIC,
 							mass: 0,
 						});
-						body.addShape(new CANNON.Box(new CANNON.Vec3(w/2,0.05,h/2)),  new CANNON.Vec3(0, 0.05 ,0));
+						body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, 0.05, h / 2)), new CANNON.Vec3(0, 0.05, 0));
 						body.position.copy(pose.transform.position);
 						body.quaternion.copy(pose.transform.orientation);
 						this._physics.driver.addBody(body);
