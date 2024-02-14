@@ -10,10 +10,7 @@
   <script id='script-xylayout' src="https://binzume.github.io/aframe-xylayout/dist/xylayout-all.min.js"></script>
   <script src="libs/mp4player/mp4player.js"></script>
   <script src="js/gesture.js"></script>
-  <script src="js/hand-controller.js"></script>
-  <script src="apps/xranchortest/xranchor.js"></script>
   <script src="js/workspace.js"></script>
-  <!-- script src="js/xrplane.js"></script -->
   <script src="storage/internal.js" type='module'></script>
   <script src="storage/google-drive.js" type='module'></script>
   <script src="storage/webkit-filesystem.js" type='module'></script>
@@ -24,7 +21,7 @@
     <a id="applist" href="#apps-panel" class='hidden'>Apps</a>
     <a id="main-menu" href="#main-menu-template" class='hidden' data-wid='mainMenu'>MainMenu</a>
     <a id="app-calc" href="apps/calc/template.html">Calculator</a>
-    <a id="app-notepad" href="apps/notepad/template.html" data-content-type="text/*">Notepad</a>
+    <a id="app-notepad" href="apps/notepad/template.html" data-content-type="text/*" data-content-name-suffix=".txt,.md,.js,.go,.cc,.h">Notepad</a>
     <a id="app-paint3d" href="apps/paint3d/index.html">Paint3D</a>
     <a id="app-console" href="apps/console/console.html" data-wid='debug-console'>Console</a>
     <a id="app-media-selector" href="apps/mediaplayer/template.html#media-selector-template">Storage</a>
@@ -106,7 +103,10 @@
     <a href="https://github.com/binzume/vr-workspace">GitHub</a>
   </div>
   <div style="position:absolute;top:10pt;right:80pt;width:100pt;background-color:white;border-radius:4pt;text-align:center;">
-    <a href="storage/settings.html">Storage Settings</a>
+    <a href="storage/settings.html">Storage Manager</a>
+  </div>
+  <div style="position:absolute;top:10pt;right:190pt;width:50pt;background-color:white;border-radius:4pt;text-align:center;">
+    <a href="flags/flags.html">Flags</a>
   </div>
 </body>
 

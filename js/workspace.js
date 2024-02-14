@@ -21,7 +21,7 @@ class AppManager {
 		// options.appSelector && this.loadAppList(options.appSelector);
 		this._flags = JSON.parse(localStorage.getItem('flags') || '{}');
 		let scriptFlags = [
-			{ flag: 'xranchor', def: false, id: 'script-xranchor', src: 'apps/xranchortest/xranchor.js' },
+			{ flag: 'xranchor', def: true, id: 'script-xranchor', src: 'apps/xranchortest/xranchor.js' },
 			{ flag: 'xrplane', def: false, id: 'script-xrplane', src: 'js/xrplane.js' },
 			{ flag: 'hand-controller', def: false, id: 'script-hand-controller', src: 'js/hand-controller.js' },
 			{ flag: 'physics', def: false, id: 'script-physics', src: 'https://cdn.rawgit.com/donmccurdy/aframe-physics-system/v4.0.1/dist/aframe-physics-system.min.js' },
