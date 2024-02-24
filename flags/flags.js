@@ -22,6 +22,7 @@ window.addEventListener('DOMContentLoaded', ev => {
         attrs instanceof Function ? attrs(el) : (attrs && Object.assign(el, attrs));
         return el;
     }
+    let save = () => localStorage.setItem(flagsKey, JSON.stringify(values));
 
     let values = JSON.parse(localStorage.getItem(flagsKey) || '{}');
     let listEl = document.querySelector('#flags');
@@ -39,6 +40,7 @@ window.addEventListener('DOMContentLoaded', ev => {
                     } else {
                         values[f.id] = selectEl.value == 'true';
                     }
+                    save();
                 }
             });
             selectEl.value = values[f.id] == null ? 'null' :
@@ -53,17 +55,13 @@ window.addEventListener('DOMContentLoaded', ev => {
                     } else {
                         values[f.id] = ev.target.value;
                     }
+                    save();
                 }
             }));
         }
         listEl.append(el);
     }
 
-    document.querySelector('#save-button').addEventListener('click', ev => {
-        ev.preventDefault();
-        localStorage.setItem(flagsKey, JSON.stringify(values));
-        alert('Saved ' + Object.keys(values).length + ' flags');
-    });
     document.querySelector('#reset-button').addEventListener('click', ev => {
         ev.preventDefault();
         localStorage.removeItem(flagsKey);
